@@ -55,6 +55,9 @@ jobs:
             npm run build
 
             echo "→ Restart app..."
-            pm2 restart creamee --update-env
+            pm2 describe creamee > /dev/null 2>&1 \
+              && pm2 restart creamee --update-env \
+              || PORT=3001 pm2 start npm --name "creamee" -- start
+            pm2 save
 
             echo "✓ Deploy xong!"
