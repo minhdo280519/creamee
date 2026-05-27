@@ -1,7 +1,8 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useTransition } from 'react';
 import { Moon, Sun, LogOut, User, ChevronDown } from 'lucide-react';
 import { signOut } from '@/app/login/actions';
 import { Button } from '@/components/ui/button';
@@ -54,6 +55,16 @@ const AVATAR_COLORS: Record<Role, string> = {
 export function Topbar({ fullName, email, role }: TopbarProps) {
   const { theme, setTheme } = useTheme();
   const { section, page } = usePageTitle();
+  const router = useRouter();
+  const [, startTransition] = useTransition();
+
+  function handleSignOut() {
+    startTransition(async () => {
+      await signOut();
+      router.push('/login');
+      router.refresh();
+    });
+  }
 
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b bg-card px-4 md:px-6">
@@ -120,14 +131,13 @@ export function Topbar({ fullName, email, role }: TopbarProps) {
 
             <DropdownMenuSeparator />
 
-            <form action={signOut} className="w-full">
-              <DropdownMenuItem asChild>
-                <button type="submit" className="w-full flex items-center cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Đăng xuất
-                </button>
-              </DropdownMenuItem>
-            </form>
+            <DropdownMenuItem
+              className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive"
+              onSelect={(e) => { e.preventDefault(); handleSignOut(); }}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Đăng xuất
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
