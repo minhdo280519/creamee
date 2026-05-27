@@ -120,13 +120,13 @@ export function Topbar({ fullName, email, role }: TopbarProps) {
 
             <DropdownMenuSeparator />
 
-            <form action={signOut}>
-              <button type="submit" className="w-full">
-                <DropdownMenuItem className="cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive">
+            <form action={signOut} className="w-full">
+              <DropdownMenuItem asChild>
+                <button type="submit" className="w-full flex items-center cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   Đăng xuất
-                </DropdownMenuItem>
-              </button>
+                </button>
+              </DropdownMenuItem>
             </form>
           </DropdownMenuContent>
         </DropdownMenu>
