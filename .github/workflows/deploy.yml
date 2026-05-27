@@ -62,7 +62,7 @@ jobs:
           echo "→ Pull code mới..."
           git pull origin main
           echo "→ Cài dependencies..."
-          npm ci --omit=dev
+          npm ci
           echo "→ Build Next.js..."
           npm run build
           echo "→ Restart app..."
