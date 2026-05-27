@@ -43,7 +43,7 @@ jobs:
           port: ${{ secrets.VPS_PORT }}
           script: |
             set -e
-            cd /var/www/creamee
+            cd /opt/creamee
 
             echo "→ Pull code mới..."
             git pull origin main
