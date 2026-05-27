@@ -1,0 +1,100 @@
+import type { EntitySchema } from '@/lib/schema-form';
+
+/** Schema entity Khách hàng — form + table tự generate từ đây. */
+export const customerSchema: EntitySchema = {
+  name: 'customers',
+  label: 'khách hàng',
+  table: 'customers',
+  fields: [
+    {
+      name: 'code',
+      label: 'Mã KH',
+      type: 'text',
+      readOnly: true,
+      inForm: true,
+      sortable: true,
+      hint: 'Tự sinh khi tạo mới',
+      placeholder: 'Tự động',
+    },
+    {
+      name: 'name',
+      label: 'Tên khách hàng',
+      type: 'text',
+      required: true,
+      sortable: true,
+      placeholder: 'VD: Shop Thời Trang ABC',
+    },
+    {
+      name: 'phone',
+      label: 'Số điện thoại',
+      type: 'phone',
+      sortable: true,
+      placeholder: '09xxxxxxxx',
+    },
+    {
+      name: 'email',
+      label: 'Email',
+      type: 'email',
+      inTable: false,
+      placeholder: 'kh@email.com',
+    },
+    {
+      name: 'city',
+      label: 'Tỉnh/Thành',
+      type: 'text',
+      sortable: true,
+      placeholder: 'VD: Hà Nội',
+    },
+    {
+      name: 'address',
+      label: 'Địa chỉ',
+      type: 'text',
+      inTable: false,
+    },
+    {
+      name: 'tax_code',
+      label: 'Mã số thuế',
+      type: 'text',
+      inTable: false,
+    },
+    {
+      name: 'tier',
+      label: 'Hạng KH',
+      type: 'select',
+      sortable: true,
+      defaultValue: 'standard',
+      options: [
+        { value: 'standard', label: 'Tiêu chuẩn' },
+        { value: 'silver', label: 'Bạc' },
+        { value: 'gold', label: 'Vàng' },
+        { value: 'vip', label: 'VIP' },
+      ],
+    },
+    {
+      name: 'credit_limit',
+      label: 'Hạn mức công nợ',
+      type: 'currency',
+      inTable: false,
+      hint: '0 = không giới hạn',
+    },
+    {
+      name: 'payment_terms_days',
+      label: 'Số ngày công nợ',
+      type: 'number',
+      inTable: false,
+    },
+    {
+      name: 'notes',
+      label: 'Ghi chú',
+      type: 'textarea',
+      inTable: false,
+    },
+    {
+      name: 'is_active',
+      label: 'Đang hoạt động',
+      type: 'switch',
+      inTable: false,
+      defaultValue: true,
+    },
+  ],
+};
