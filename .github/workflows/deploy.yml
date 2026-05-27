@@ -36,30 +36,31 @@ jobs:
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
         run: npm run build
 
+      - name: Write SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p ${{ secrets.VPS_PORT }} ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
       - name: Deploy to VPS via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          port: ${{ secrets.VPS_PORT }}
-          script: |
-            set -e
-            cd /opt/creamee
-
-            echo "→ Pull code mới..."
-            git pull origin main
-
-            echo "→ Cài dependencies..."
-            npm ci --omit=dev
-
-            echo "→ Build Next.js..."
-            npm run build
-
-            echo "→ Restart app..."
-            pm2 describe creamee > /dev/null 2>&1 \
-              && pm2 restart creamee --update-env \
-              || PORT=3001 pm2 start npm --name "creamee" -- start
-            pm2 save
-
-            echo "✓ Deploy xong!"
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            -p ${{ secrets.VPS_PORT }} \
+            -o StrictHostKeyChecking=no \
+            ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+          set -e
+          cd /opt/creamee
+          echo "→ Pull code mới..."
+          git pull origin main
+          echo "→ Cài dependencies..."
+          npm ci --omit=dev
+          echo "→ Build Next.js..."
+          npm run build
+          echo "→ Restart app..."
+          pm2 describe creamee > /dev/null 2>&1 \
+            && pm2 restart creamee --update-env \
+            || PORT=3001 pm2 start npm --name "creamee" -- start
+          pm2 save
+          echo "✓ Deploy xong!"
+          ENDSSH
