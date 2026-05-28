@@ -52,6 +52,7 @@ export const NAV_TREE: NavSection[] = [
       { href: '/purchase-orders', label: 'Đơn nhập hàng' },
       { href: '/suppliers', label: 'Nhà cung cấp' },
       { href: '/logistics', label: 'Vận chuyển & Chi phí' },
+      { href: '/samples', label: 'Quản lý mẫu' },
     ],
   },
   {
@@ -61,6 +62,7 @@ export const NAV_TREE: NavSection[] = [
     items: [
       { href: '/products', label: 'Sản phẩm' },
       { href: '/inventory-lots', label: 'Tồn kho theo lô' },
+      { href: '/warehouse', label: 'Nhập/Xuất kho' },
     ],
   },
   {

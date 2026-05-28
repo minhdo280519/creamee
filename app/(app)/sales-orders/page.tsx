@@ -16,12 +16,18 @@ export default async function SalesOrdersPage() {
     await Promise.all([
       query<{
         id: string; code: string; customer_id: string; order_date: string;
+        delivery_date: string | null; delivery_address: string | null;
+        notes: string | null; discount_amount: number; shipping_fee: number;
+        deposit_amount: number;
         total: number; status: string; payment_status: string; created_by: string | null;
         customer_name: string | null; customer_code: string | null; customer_phone: string | null;
         creator_full_name: string | null;
       }>(
-        `SELECT so.id, so.code, so.customer_id, so.order_date, so.total,
-                so.status, so.payment_status, so.created_by,
+        `SELECT so.id, so.code, so.customer_id, so.order_date,
+                so.delivery_date, so.delivery_address, so.notes,
+                so.discount_amount, so.shipping_fee,
+                COALESCE(so.deposit_amount, 0) AS deposit_amount,
+                so.total, so.status, so.payment_status, so.created_by,
                 c.code AS customer_code, c.name AS customer_name, c.phone AS customer_phone,
                 p.full_name AS creator_full_name
          FROM sales_orders so

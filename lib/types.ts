@@ -6,6 +6,8 @@
 
 import type { Role } from './roles';
 
+export type SampleStatus = 'pending' | 'approved' | 'cancelled';
+
 export type OrderStatus =
   | 'draft' | 'pending_approval' | 'approved' | 'partial_paid' | 'paid'
   | 'partial_delivered' | 'delivered' | 'completed' | 'cancelled';
@@ -74,12 +76,36 @@ export interface Supplier {
   updated_at: string;
 }
 
+export interface PurchaseOrder {
+  id: string;
+  code: string;
+  supplier_id: string;
+  so_id: string | null;
+  so_code: string | null;
+  order_date: string;
+  expected_arrival_date: string | null;
+  currency: string;
+  fx_rate: number;
+  subtotal_cny: number;
+  shipping_cny: number;
+  total_cny: number;
+  total_vnd: number;
+  paid_cny: number;
+  status: string;
+  payment_status: string;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Product — cost_cny/cost_vnd là null nếu role không được xem (qua v_products_safe). */
 export interface Product {
   id: string;
   sku: string;
   name: string;
   description: string | null;
+  image_url: string | null;
   category: string | null;
   supplier_id: string | null;
   cost_cny: number | null;
@@ -115,6 +141,7 @@ export interface SalesOrder {
   tax_amount: number;
   total: number;
   paid_amount: number;
+  deposit_amount: number;
   delivered_amount: number;
   status: OrderStatus;
   payment_status: PaymentStatus;
@@ -218,7 +245,7 @@ export interface ShippingCarrier {
 }
 
 /** Loại chặng vận chuyển — cùng một dạng chi phí. */
-export type ShipmentLegType = 'cn_domestic' | 'cn_to_vn' | 'vn_domestic';
+export type ShipmentLegType = 'cn_domestic' | 'cn_to_vn' | 'vn_domestic' | 'vn_to_customer';
 export type ShipmentPayer = 'ncc_advance' | 'we_pay_now' | 'we_arrange';
 export type ShipmentChargeMode = 'per_kg' | 'flat';
 
@@ -226,6 +253,9 @@ export type ShipmentChargeMode = 'per_kg' | 'flat';
 export interface Shipment {
   id: string;
   code: string;
+  tracking_number: string | null;
+  so_id: string | null;
+  so_code: string | null;
   leg: ShipmentLegType;
   carrier_id: string | null;
   payer: ShipmentPayer;
@@ -279,6 +309,35 @@ export interface OrderPnL {
   /** Lãi gộp sau khi trừ ship. */
   gross_profit: number | null;
   gross_margin_pct: number | null;
+}
+
+export interface Sample {
+  id: string;
+  code: string;
+  customer_id: string;
+  product_id: string | null;
+  product_name: string;
+  supplier_id: string | null;
+  status: SampleStatus;
+  deposit_amount: number;
+  deposit_paid: number;
+  refund_amount: number;
+  goods_cost_cny: number;
+  goods_cost_vnd: number;
+  ship_cost_vnd: number;
+  sample_fee_vnd: number;
+  other_cost_vnd: number;
+  fx_rate: number;
+  cumulative_qty_ordered: number;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SampleWithRelations extends Sample {
+  customer: Pick<Customer, 'id' | 'code' | 'name'> | null;
+  supplier: Pick<Supplier, 'id' | 'code' | 'name'> | null;
 }
 
 export interface MonthlyPnL {

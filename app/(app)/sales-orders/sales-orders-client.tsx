@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, Check, X, Truck } from 'lucide-react';
+import { Plus, Search, Check, X, Truck, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { vnd, formatDate } from '@/lib/utils';
 import {
@@ -10,7 +10,7 @@ import {
   PAYMENT_STATUS_LABEL, PAYMENT_STATUS_VARIANT,
 } from '@/lib/order-status';
 import type { SalesOrderWithCustomer } from '@/lib/types';
-import { approveSalesOrder, rejectSalesOrder } from './actions';
+import { approveSalesOrder, rejectSalesOrder, getSalesOrderItems } from './actions';
 import { SalesOrderForm } from './sales-order-form';
 import { DeliveryDialog } from './delivery-dialog';
 import { Button } from '@/components/ui/button';
@@ -31,6 +31,15 @@ interface ProductOption {
   wholesale_price_vnd: number | null;
 }
 
+interface DraftLine {
+  _key: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  discount_pct: number;
+}
+
 interface Props {
   orders: SalesOrderWithCustomer[];
   customers: EntityOption[];
@@ -46,6 +55,9 @@ export function SalesOrdersClient({
   const router = useRouter();
   const [query, setQuery] = React.useState('');
   const [formOpen, setFormOpen] = React.useState(false);
+  const [editingOrder, setEditingOrder] = React.useState<SalesOrderWithCustomer | null>(null);
+  const [editingItems, setEditingItems] = React.useState<DraftLine[]>([]);
+  const [loadingEdit, setLoadingEdit] = React.useState<string | null>(null);
   // Đơn đang mở dialog giao hàng.
   const [deliverOrderId, setDeliverOrderId] = React.useState<string | null>(null);
   const [deliverOrderCode, setDeliverOrderCode] = React.useState('');
@@ -68,6 +80,17 @@ export function SalesOrdersClient({
     }
     toast.success('Đã duyệt đơn');
     router.refresh();
+  }
+
+  async function handleOpenEdit(order: SalesOrderWithCustomer) {
+    setLoadingEdit(order.id);
+    const r = await getSalesOrderItems(order.id);
+    setLoadingEdit(null);
+    if (!r.ok || !r.items) { toast.error('Không tải được dòng hàng'); return; }
+    setEditingItems(
+      r.items.map((it) => ({ ...it, _key: crypto.randomUUID() })),
+    );
+    setEditingOrder(order);
   }
 
   async function handleReject(id: string) {
@@ -145,6 +168,19 @@ export function SalesOrdersClient({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex justify-end gap-1">
+                      {/* Sửa đơn — chưa hoàn thành/huỷ. */}
+                      {canCreate && !['completed', 'cancelled'].includes(o.status) && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          disabled={loadingEdit === o.id}
+                          onClick={() => handleOpenEdit(o)}
+                        >
+                          {loadingEdit === o.id
+                            ? <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                            : <Pencil className="h-4 w-4" />}
+                        </Button>
+                      )}
                       {/* Duyệt / từ chối — đơn chờ duyệt. */}
                       {canApprove && o.status === 'pending_approval' && (
                         <>
@@ -188,7 +224,7 @@ export function SalesOrdersClient({
       )}
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Tạo đơn bán mới</DialogTitle>
           </DialogHeader>
@@ -198,6 +234,34 @@ export function SalesOrdersClient({
             onQuickCreateCustomer={onQuickCreateCustomer}
             onClose={() => setFormOpen(false)}
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editingOrder !== null} onOpenChange={(o) => { if (!o) setEditingOrder(null); }}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Sửa đơn {editingOrder?.code}</DialogTitle>
+          </DialogHeader>
+          {editingOrder && (
+            <SalesOrderForm
+              customers={customers}
+              products={products}
+              onQuickCreateCustomer={onQuickCreateCustomer}
+              onClose={() => setEditingOrder(null)}
+              editing={{
+                id: editingOrder.id,
+                customer_id: editingOrder.customer_id,
+                order_date: editingOrder.order_date,
+                delivery_date: (editingOrder as unknown as Record<string, unknown>).delivery_date as string | null ?? null,
+                delivery_address: (editingOrder as unknown as Record<string, unknown>).delivery_address as string | null ?? null,
+                notes: (editingOrder as unknown as Record<string, unknown>).notes as string | null ?? null,
+                deposit_amount: Number((editingOrder as unknown as Record<string, unknown>).deposit_amount ?? 0),
+                discount_amount: Number((editingOrder as unknown as Record<string, unknown>).discount_amount ?? 0),
+                shipping_fee: Number((editingOrder as unknown as Record<string, unknown>).shipping_fee ?? 0),
+              }}
+              editingItems={editingItems}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

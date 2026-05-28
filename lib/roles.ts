@@ -97,6 +97,7 @@ export const ROUTE_ACCESS: Record<string, Role[]> = {
   '/purchase-orders': ['owner', 'manager', 'warehouse'],
   '/warehouse': ['owner', 'manager', 'warehouse'],
   '/logistics': ['owner', 'manager', 'warehouse'],
+  '/samples': ['owner', 'manager', 'warehouse', 'sales'],
   '/cash': ['owner', 'accountant_lead', 'accountant', 'manager'],
   '/ar-ap': ['owner', 'manager', 'accountant_lead', 'accountant'],
   '/deals': ['owner', 'manager', 'sales'],

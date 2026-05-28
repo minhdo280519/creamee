@@ -9,6 +9,7 @@ import {
   allocateLegCost, LEG_LABEL, LEG_HINT,
   type ShipmentLeg, type ChargeMode,
 } from '@/lib/landed-cost';
+import { Textarea } from '@/components/ui/textarea';
 import { createShipmentLeg } from './actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,9 +41,16 @@ export interface POItemOption {
   goods_cost_vnd: number;
 }
 
+interface SOOption {
+  id: string;
+  code: string;
+  customer_name: string;
+}
+
 interface Props {
   carriers: CarrierOption[];
   poItems: POItemOption[];
+  salesOrders: SOOption[];
   defaultFxRate: number;
   onClose: () => void;
 }
@@ -53,10 +61,12 @@ interface DraftItem {
   weight_kg: number;
 }
 
-export function LegForm({ carriers, poItems, defaultFxRate, onClose }: Props) {
+export function LegForm({ carriers, poItems, salesOrders, defaultFxRate, onClose }: Props) {
   const router = useRouter();
 
   const [leg, setLeg] = React.useState<ShipmentLeg>('cn_to_vn');
+  const [trackingNumber, setTrackingNumber] = React.useState('');
+  const [selectedSoId, setSelectedSoId] = React.useState('');
   const [carrierId, setCarrierId] = React.useState('');
   const [payer, setPayer] =
     React.useState<'ncc_advance' | 'we_pay_now' | 'we_arrange'>('we_pay_now');
@@ -66,6 +76,8 @@ export function LegForm({ carriers, poItems, defaultFxRate, onClose }: Props) {
   const [fxRate, setFxRate] = React.useState(defaultFxRate);
   const [notes, setNotes] = React.useState('');
   const [saving, setSaving] = React.useState(false);
+
+  const isCustomerShip = leg === 'vn_to_customer';
 
   const [items, setItems] = React.useState<DraftItem[]>([
     { _key: crypto.randomUUID(), po_item_id: '', weight_kg: 0 },
@@ -143,8 +155,12 @@ export function LegForm({ carriers, poItems, defaultFxRate, onClose }: Props) {
 
     setSaving(true);
     try {
+      const selectedSo = salesOrders.find((s) => s.id === selectedSoId);
       const r = await createShipmentLeg({
         leg,
+        tracking_number: trackingNumber || undefined,
+        so_id: selectedSo?.id || undefined,
+        so_code: selectedSo?.code || undefined,
         carrier_id: carrierId || undefined,
         payer,
         charge_mode: chargeMode,
@@ -153,7 +169,7 @@ export function LegForm({ carriers, poItems, defaultFxRate, onClose }: Props) {
         currency,
         fx_rate: effectiveFx,
         notes,
-        items: valid,
+        items: isCustomerShip ? [] : valid,
       });
       if (!r.ok) {
         toast.error(r.error ?? 'Tạo chặng thất bại');
@@ -181,6 +197,7 @@ export function LegForm({ carriers, poItems, defaultFxRate, onClose }: Props) {
               <SelectItem value="cn_domestic">{LEG_LABEL.cn_domestic}</SelectItem>
               <SelectItem value="cn_to_vn">{LEG_LABEL.cn_to_vn}</SelectItem>
               <SelectItem value="vn_domestic">{LEG_LABEL.vn_domestic}</SelectItem>
+              <SelectItem value="vn_to_customer">{LEG_LABEL.vn_to_customer}</SelectItem>
             </SelectContent>
           </Select>
           <p className="text-xs text-muted-foreground">{LEG_HINT[leg]}</p>
@@ -215,6 +232,34 @@ export function LegForm({ carriers, poItems, defaultFxRate, onClose }: Props) {
               <SelectItem value="ncc_advance">NCC ứng trước</SelectItem>
               <SelectItem value="we_pay_now">Mình trả ngay</SelectItem>
               <SelectItem value="we_arrange">Mình tự thuê</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Mã vận đơn + SO liên quan */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="space-y-1.5">
+          <Label>Mã vận đơn (tracking)</Label>
+          <Input
+            value={trackingNumber}
+            onChange={(e) => setTrackingNumber(e.target.value)}
+            placeholder="VD: SF1234567890, J&T89012345"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>{isCustomerShip ? 'Đơn bán hàng *' : 'Đơn bán liên quan'}</Label>
+          <Select value={selectedSoId} onValueChange={setSelectedSoId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Chọn SO (tuỳ chọn)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">— Không gắn SO —</SelectItem>
+              {salesOrders.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.code} · {s.customer_name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -275,8 +320,13 @@ export function LegForm({ carriers, poItems, defaultFxRate, onClose }: Props) {
         )}
       </div>
 
-      {/* Các dòng hàng — chọn dòng PO, nhập kg */}
-      <div>
+      {/* Các dòng hàng — chỉ cho chặng NCC/nội địa */}
+      {isCustomerShip && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700">
+          Chặng giao tới khách — chọn đơn bán ở trên. Không cần khai báo từng dòng hàng.
+        </div>
+      )}
+      <div className={isCustomerShip ? 'hidden' : ''}>
         <div className="mb-2 flex items-center justify-between">
           <Label>
             Hàng trong chặng — chọn dòng đơn mua (có thể gộp nhiều PO)

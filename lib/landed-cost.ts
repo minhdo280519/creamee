@@ -10,7 +10,7 @@
  * Cả ba đều CÙNG một dạng chi phí, phân bổ theo trọng lượng (kg).
  */
 
-export type ShipmentLeg = 'cn_domestic' | 'cn_to_vn' | 'vn_domestic';
+export type ShipmentLeg = 'cn_domestic' | 'cn_to_vn' | 'vn_domestic' | 'vn_to_customer';
 export type ChargeMode = 'per_kg' | 'flat';
 
 /** Một dòng hàng trong chặng. */
@@ -101,8 +101,9 @@ export function allocateLegCost(
 /** Nhãn tiếng Việt cho loại chặng. */
 export const LEG_LABEL: Record<ShipmentLeg, string> = {
   cn_domestic: 'Nội địa Trung Quốc',
-  cn_to_vn: 'Trung Quốc → Hà Nội',
+  cn_to_vn: 'Trung Quốc → Việt Nam',
   vn_domestic: 'Nội địa Việt Nam',
+  vn_to_customer: 'Giao hàng tới khách',
 };
 
 /** Mô tả ngắn cho mỗi loại chặng. */
@@ -110,6 +111,7 @@ export const LEG_HINT: Record<ShipmentLeg, string> = {
   cn_domestic: 'NCC → kho gom tại Trung Quốc',
   cn_to_vn: 'Kho TQ → Hà Nội, thường tính theo kg',
   vn_domestic: 'Hà Nội → HCM hoặc kho khác',
+  vn_to_customer: 'Kho → địa chỉ khách hàng, gắn theo đơn bán',
 };
 
 /**

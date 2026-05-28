@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS products (
   id                  VARCHAR(36)   PRIMARY KEY,
   sku                 VARCHAR(100)  NOT NULL UNIQUE,
   name                VARCHAR(255)  NOT NULL,
+  image_url           VARCHAR(500)  NULL,
   description         TEXT          NULL,
   category            VARCHAR(100)  NULL,
   supplier_id         VARCHAR(36)   NULL,
@@ -118,6 +119,7 @@ CREATE TABLE IF NOT EXISTS sales_orders (
   tax_amount              DECIMAL(18,2) NOT NULL DEFAULT 0,
   total                   DECIMAL(18,2) NOT NULL DEFAULT 0,
   paid_amount             DECIMAL(18,2) NOT NULL DEFAULT 0,
+  deposit_amount          DECIMAL(18,2) NOT NULL DEFAULT 0,
   delivered_amount        DECIMAL(18,2) NOT NULL DEFAULT 0,
   status                  ENUM('draft','pending_approval','approved','partial_paid','paid',
                                'partial_delivered','delivered','completed','cancelled')
@@ -161,6 +163,8 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
   id                    VARCHAR(36)   PRIMARY KEY,
   code                  VARCHAR(50)   NOT NULL UNIQUE,
   supplier_id           VARCHAR(36)   NOT NULL,
+  so_id                 VARCHAR(36)   NULL,
+  so_code               VARCHAR(50)   NULL,
   order_date            DATE          NOT NULL,
   expected_arrival_date DATE          NULL,
   currency              VARCHAR(10)   NOT NULL DEFAULT 'CNY',
@@ -222,7 +226,10 @@ CREATE TABLE IF NOT EXISTS carrier_rate_history (
 CREATE TABLE IF NOT EXISTS shipments (
   id              VARCHAR(36)   PRIMARY KEY,
   code            VARCHAR(50)   NOT NULL UNIQUE,
-  leg             ENUM('cn_domestic','cn_to_vn','vn_domestic') NOT NULL,
+  tracking_number VARCHAR(200)  NULL,
+  so_id           VARCHAR(36)   NULL,
+  so_code         VARCHAR(50)   NULL,
+  leg             ENUM('cn_domestic','cn_to_vn','vn_domestic','vn_to_customer') NOT NULL,
   carrier_id      VARCHAR(36)   NULL,
   payer           ENUM('ncc_advance','we_pay_now','we_arrange') NOT NULL DEFAULT 'we_pay_now',
   charge_mode     ENUM('per_kg','flat') NOT NULL DEFAULT 'per_kg',
@@ -386,6 +393,36 @@ CREATE TABLE IF NOT EXISTS approvals (
   created_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_approvals_entity (entity_type, entity_id),
   INDEX idx_approvals_status (status)
+) ENGINE=InnoDB;
+
+-- ── Quản lý mẫu ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS samples (
+  id                     VARCHAR(36)   PRIMARY KEY,
+  code                   VARCHAR(50)   NOT NULL UNIQUE,
+  customer_id            VARCHAR(36)   NOT NULL,
+  product_id             VARCHAR(36)   NULL,
+  product_name           VARCHAR(255)  NOT NULL,
+  supplier_id            VARCHAR(36)   NULL,
+  status                 ENUM('pending','approved','cancelled') NOT NULL DEFAULT 'pending',
+  deposit_amount         DECIMAL(18,2) NOT NULL DEFAULT 3500000,
+  deposit_paid           DECIMAL(18,2) NOT NULL DEFAULT 0,
+  refund_amount          DECIMAL(18,2) NOT NULL DEFAULT 0,
+  goods_cost_cny         DECIMAL(18,4) NOT NULL DEFAULT 0,
+  goods_cost_vnd         DECIMAL(18,2) NOT NULL DEFAULT 0,
+  ship_cost_vnd          DECIMAL(18,2) NOT NULL DEFAULT 0,
+  sample_fee_vnd         DECIMAL(18,2) NOT NULL DEFAULT 0,
+  other_cost_vnd         DECIMAL(18,2) NOT NULL DEFAULT 0,
+  fx_rate                DECIMAL(10,4) NOT NULL DEFAULT 3625,
+  cumulative_qty_ordered INT           NOT NULL DEFAULT 0,
+  notes                  TEXT          NULL,
+  created_by             VARCHAR(36)   NULL,
+  created_at             DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at             DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  INDEX idx_samples_customer (customer_id),
+  INDEX idx_samples_status   (status),
+  FOREIGN KEY (customer_id) REFERENCES customers(id),
+  FOREIGN KEY (product_id)  REFERENCES products(id)  ON DELETE SET NULL,
+  FOREIGN KEY (supplier_id) REFERENCES suppliers(id) ON DELETE SET NULL
 ) ENGINE=InnoDB;
 
 -- ── Thông báo ─────────────────────────────────────────────────────────────────
@@ -618,5 +655,5 @@ UPDATE products SET current_stock = (
 );
 
 INSERT INTO code_sequences (prefix, last_val) VALUES
-  ('SO',6),('PO',3),('SHP',2),('DEAL',6),('THU',4),('CHI',6),('LOT',6),('NCC',6),('KH',15)
+  ('SO',6),('PO',3),('SHP',2),('DEAL',6),('THU',4),('CHI',6),('LOT',6),('NCC',6),('KH',15),('MAU',0)
 ON DUPLICATE KEY UPDATE last_val = VALUES(last_val);

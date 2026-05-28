@@ -48,22 +48,26 @@ interface POShipRow {
   leg_count: number;
 }
 
-const LEG_BADGE: Record<ShipmentLeg, 'secondary' | 'warning' | 'default'> = {
+const LEG_BADGE: Record<ShipmentLeg, 'secondary' | 'warning' | 'default' | 'success'> = {
   cn_domestic: 'secondary',
   cn_to_vn: 'warning',
   vn_domestic: 'default',
+  vn_to_customer: 'success',
 };
+
+interface SOOption { id: string; code: string; customer_name: string; }
 
 interface Props {
   carriers: Carrier[];
   legs: LegRow[];
   poShipRows: POShipRow[];
   poItems: POItemOption[];
+  salesOrders: SOOption[];
   defaultFxRate: number;
 }
 
 export function LogisticsClient({
-  carriers, legs, poShipRows, poItems, defaultFxRate,
+  carriers, legs, poShipRows, poItems, salesOrders, defaultFxRate,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = React.useState<'legs' | 'carriers' | 'cost'>('legs');
@@ -307,6 +311,7 @@ export function LogisticsClient({
           <LegForm
             carriers={carriers}
             poItems={poItems}
+            salesOrders={salesOrders}
             defaultFxRate={defaultFxRate}
             onClose={() => setLegFormOpen(false)}
           />

@@ -79,6 +79,13 @@ export const productSchema: EntitySchema = {
       inTable: false,
     },
     {
+      name: 'image_url',
+      label: 'URL Ảnh sản phẩm',
+      type: 'text',
+      inTable: false,
+      placeholder: 'https://... (để trống nếu chưa có)',
+    },
+    {
       name: 'description',
       label: 'Mô tả',
       type: 'textarea',

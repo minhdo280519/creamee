@@ -69,6 +69,9 @@ export interface LegItemDraft {
 
 export interface CreateLegDraft {
   leg: ShipmentLeg;
+  tracking_number?: string;
+  so_id?: string;
+  so_code?: string;
   carrier_id?: string;
   payer: 'ncc_advance' | 'we_pay_now' | 'we_arrange';
   charge_mode: ChargeMode;
@@ -88,8 +91,12 @@ export async function createShipmentLeg(
 ): Promise<ActionResult<{ id: string; code: string }>> {
   const profile = await requireUser();
 
-  if (draft.items.length === 0) {
+  const isCustomerShip = draft.leg === 'vn_to_customer';
+  if (!isCustomerShip && draft.items.length === 0) {
     return { ok: false, error: 'Chặng cần ít nhất 1 dòng hàng' };
+  }
+  if (isCustomerShip && !draft.so_id) {
+    return { ok: false, error: 'Chặng giao khách cần chọn đơn bán hàng' };
   }
   for (const [i, it] of draft.items.entries()) {
     if (!it.po_item_id) return { ok: false, error: `Dòng ${i + 1}: chưa chọn dòng đơn mua` };
@@ -107,11 +114,14 @@ export async function createShipmentLeg(
 
   const { affectedRows } = await query(
     `INSERT INTO shipments
-     (id, code, leg, carrier_id, payer, charge_mode, rate_per_kg_cny,
-      flat_cost, currency, fx_rate, notes, created_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     (id, code, tracking_number, so_id, so_code, leg, carrier_id, payer, charge_mode,
+      rate_per_kg_cny, flat_cost, currency, fx_rate, notes, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
-      id, code, draft.leg,
+      id, code,
+      draft.tracking_number || null,
+      draft.so_id || null, draft.so_code || null,
+      draft.leg,
       draft.carrier_id || null, draft.payer, draft.charge_mode,
       draft.rate_per_kg_cny || 0, draft.flat_cost || 0,
       draft.currency, draft.fx_rate,

@@ -26,8 +26,8 @@ export async function createProduct(
     `INSERT INTO products
      (id, sku, name, category, supplier_id, base_price_vnd,
       wholesale_price_vnd, weight_grams, reorder_point, reorder_qty,
-      description, is_active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      image_url, description, is_active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id, sku, name,
       values.category || null,
@@ -37,6 +37,7 @@ export async function createProduct(
       Number(values.weight_grams) || null,
       Number(values.reorder_point) || 0,
       Number(values.reorder_qty) || 0,
+      values.image_url || null,
       values.description || null,
       values.is_active !== false ? 1 : 0,
     ],
@@ -59,7 +60,7 @@ export async function updateProduct(
     `UPDATE products SET
        sku = ?, name = ?, category = ?, supplier_id = ?,
        base_price_vnd = ?, wholesale_price_vnd = ?, weight_grams = ?,
-       reorder_point = ?, reorder_qty = ?, description = ?, is_active = ?
+       reorder_point = ?, reorder_qty = ?, image_url = ?, description = ?, is_active = ?
      WHERE id = ?`,
     [
       values.sku,
@@ -71,6 +72,7 @@ export async function updateProduct(
       Number(values.weight_grams) || null,
       Number(values.reorder_point) || 0,
       Number(values.reorder_qty) || 0,
+      values.image_url || null,
       values.description || null,
       values.is_active !== false ? 1 : 0,
       id,

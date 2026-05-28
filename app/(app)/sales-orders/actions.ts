@@ -29,6 +29,19 @@ export interface CreateSODraft {
   order_discount_value: number;
   order_discount_type: 'percent' | 'fixed';
   shipping_fee: number;
+  deposit_amount?: number;
+}
+
+export interface UpdateSODraft {
+  order_id: string;
+  delivery_date?: string;
+  delivery_address?: string;
+  notes?: string;
+  items: SOLineDraft[];
+  order_discount_value: number;
+  order_discount_type: 'percent' | 'fixed';
+  shipping_fee: number;
+  deposit_amount?: number;
 }
 
 export interface AllocLine {
@@ -104,13 +117,14 @@ export async function createSalesOrder(
   const { affectedRows } = await query(
     `INSERT INTO sales_orders
      (id, code, customer_id, order_date, delivery_date, delivery_address,
-      subtotal, discount_amount, shipping_fee, total, status, payment_status,
-      notes, created_by, approved_by, approved_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', ?, ?, ?, ?)`,
+      subtotal, discount_amount, shipping_fee, total, deposit_amount,
+      status, payment_status, notes, created_by, approved_by, approved_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'unpaid', ?, ?, ?, ?)`,
     [
       id, code, draft.customer_id, draft.order_date,
       draft.delivery_date || null, draft.delivery_address || null,
       totals.subTotal, totals.discountAmount, draft.shipping_fee, totals.total,
+      draft.deposit_amount ?? 0,
       status, draft.notes || null, profile.id,
       needsApproval ? null : profile.id,
       needsApproval ? null : now,
@@ -226,6 +240,33 @@ export async function deliverOrder(
   return { ok: true };
 }
 
+/** Lấy dòng hàng của đơn để hiển thị form sửa. */
+export async function getSalesOrderItems(orderId: string): Promise<{
+  ok: boolean;
+  items?: { product_id: string; product_name: string; quantity: number; unit_price: number; discount_pct: number }[];
+  error?: string;
+}> {
+  await requireUser();
+  const { rows } = await query<{
+    product_id: string; product_name_snapshot: string; quantity: number;
+    unit_price: number; discount_pct: number;
+  }>(
+    `SELECT product_id, product_name_snapshot, quantity, unit_price, discount_pct
+     FROM sales_order_items WHERE order_id = ? ORDER BY sort_order`,
+    [orderId],
+  );
+  return {
+    ok: true,
+    items: rows.map((r) => ({
+      product_id: r.product_id,
+      product_name: r.product_name_snapshot,
+      quantity: r.quantity,
+      unit_price: r.unit_price,
+      discount_pct: r.discount_pct,
+    })),
+  };
+}
+
 /** Từ chối đơn bán. */
 export async function rejectSalesOrder(
   orderId: string,
@@ -244,6 +285,71 @@ export async function rejectSalesOrder(
      WHERE entity_type = 'sales_order' AND entity_id = ? AND status = 'pending'`,
     [profile.id, now, reason, orderId],
   );
+
+  revalidatePath('/sales-orders');
+  return { ok: true };
+}
+
+/** Cập nhật đơn bán (sửa dòng hàng, giá, tiền cọc). */
+export async function updateSalesOrder(
+  draft: UpdateSODraft,
+): Promise<ActionResult> {
+  await requireUser();
+
+  const { rows: soRows } = await query<{ status: string }>(
+    'SELECT status FROM sales_orders WHERE id = ? LIMIT 1',
+    [draft.order_id],
+  );
+  const current = soRows[0];
+  if (!current) return { ok: false, error: 'Không tìm thấy đơn' };
+  if (['completed', 'cancelled'].includes(current.status)) {
+    return { ok: false, error: 'Không thể sửa đơn đã hoàn thành hoặc đã huỷ' };
+  }
+
+  if (draft.items.length === 0) return { ok: false, error: 'Đơn cần ít nhất 1 sản phẩm' };
+  for (const [i, it] of draft.items.entries()) {
+    if (!it.product_id) return { ok: false, error: `Dòng ${i + 1}: chưa chọn sản phẩm` };
+    if (it.quantity <= 0) return { ok: false, error: `Dòng ${i + 1}: số lượng phải > 0` };
+    if (it.unit_price <= 0) return { ok: false, error: `Dòng ${i + 1}: đơn giá phải > 0` };
+  }
+
+  const lines: OrderLineInput[] = draft.items.map((it) => ({
+    qtyOrdered: it.quantity,
+    unitPrice: it.unit_price,
+    lineDiscountPercent: it.discount_pct / 100,
+  }));
+  const totals = calcOrderTotal(
+    lines,
+    { value: draft.order_discount_value, type: draft.order_discount_type },
+    draft.shipping_fee,
+  );
+
+  await query(
+    `UPDATE sales_orders SET
+       delivery_date = ?, delivery_address = ?, notes = ?,
+       subtotal = ?, discount_amount = ?, shipping_fee = ?,
+       total = ?, deposit_amount = ?
+     WHERE id = ?`,
+    [
+      draft.delivery_date || null, draft.delivery_address || null, draft.notes || null,
+      totals.subTotal, totals.discountAmount, draft.shipping_fee,
+      totals.total, draft.deposit_amount ?? 0,
+      draft.order_id,
+    ],
+  );
+
+  await query('DELETE FROM sales_order_items WHERE order_id = ?', [draft.order_id]);
+  for (const [idx, it] of draft.items.entries()) {
+    const lineTotal = it.quantity * it.unit_price * (1 - it.discount_pct / 100);
+    await query(
+      `INSERT INTO sales_order_items
+       (id, order_id, product_id, product_name_snapshot, quantity,
+        unit_price, discount_pct, line_total, sort_order)
+       VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [draft.order_id, it.product_id, it.product_name, it.quantity,
+       it.unit_price, it.discount_pct, Math.round(lineTotal), idx],
+    );
+  }
 
   revalidatePath('/sales-orders');
   return { ok: true };

@@ -16,6 +16,7 @@ export default async function LogisticsPage() {
     { rows: poItemRows },
     { rows: settingRows },
     { rows: poShipRows },
+    { rows: soRows },
   ] = await Promise.all([
     query<{
       id: string; name: string; contact: string | null;
@@ -70,6 +71,13 @@ export default async function LogisticsPage() {
        GROUP BY po.id
        LIMIT 300`,
     ),
+    query<{ id: string; code: string; customer_name: string }>(
+      `SELECT so.id, so.code, COALESCE(c.name, '—') AS customer_name
+       FROM sales_orders so
+       LEFT JOIN customers c ON so.customer_id = c.id
+       WHERE so.status NOT IN ('cancelled','completed')
+       ORDER BY so.order_date DESC LIMIT 200`,
+    ),
   ]);
 
   const carriers = carrierRows.map((c) => ({ ...c, is_active: Boolean(c.is_active) }));
@@ -88,6 +96,7 @@ export default async function LogisticsPage() {
     goods_cost_vnd: Math.round(it.line_total_cny * (it.fx_rate ?? 1)),
   }));
   const defaultFxRate = Number(settingRows[0]?.value ?? 4060);
+  const salesOrders = soRows.map((r) => ({ id: r.id, code: r.code, customer_name: r.customer_name }));
 
   return (
     <div>
@@ -100,6 +109,7 @@ export default async function LogisticsPage() {
         legs={legs}
         poShipRows={poShipRows}
         poItems={poItems}
+        salesOrders={salesOrders}
         defaultFxRate={defaultFxRate}
       />
     </div>

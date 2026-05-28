@@ -6,7 +6,7 @@ import { Plus, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { vnd } from '@/lib/utils';
 import { calcOrderTotal, type OrderLineInput } from '@/lib/business-logic';
-import { createSalesOrder, type SOLineDraft } from './actions';
+import { createSalesOrder, updateSalesOrder, type SOLineDraft, type UpdateSODraft } from './actions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,12 +27,27 @@ interface ProductOption {
   wholesale_price_vnd: number | null;
 }
 
+interface EditingOrder {
+  id: string;
+  customer_id: string;
+  order_date: string;
+  delivery_date: string | null;
+  delivery_address: string | null;
+  notes: string | null;
+  deposit_amount: number;
+  discount_amount: number;
+  shipping_fee: number;
+}
+
 interface Props {
   customers: EntityOption[];
   products: ProductOption[];
   /** Tạo nhanh khách hàng cho combobox auto-add. */
   onQuickCreateCustomer: (name: string) => Promise<EntityOption>;
   onClose: () => void;
+  /** Nếu có → chế độ sửa. */
+  editing?: EditingOrder;
+  editingItems?: DraftLine[];
 }
 
 interface DraftLine extends SOLineDraft {
@@ -43,23 +58,34 @@ interface DraftLine extends SOLineDraft {
 const APPROVAL_THRESHOLD = 50_000_000;
 
 export function SalesOrderForm({
-  customers, products, onQuickCreateCustomer, onClose,
+  customers, products, onQuickCreateCustomer, onClose, editing, editingItems,
 }: Props) {
   const router = useRouter();
-  const [customerId, setCustomerId] = React.useState<string | null>(null);
+  const isEdit = !!editing;
+  const [customerId, setCustomerId] = React.useState<string | null>(editing?.customer_id ?? null);
   const [orderDate, setOrderDate] = React.useState(
-    new Date().toISOString().slice(0, 10),
+    editing?.order_date ?? new Date().toISOString().slice(0, 10),
   );
-  const [deliveryAddress, setDeliveryAddress] = React.useState('');
-  const [notes, setNotes] = React.useState('');
+  const [deliveryAddress, setDeliveryAddress] = React.useState(editing?.delivery_address ?? '');
+  const [notes, setNotes] = React.useState(editing?.notes ?? '');
   const [discountValue, setDiscountValue] = React.useState(0);
-  const [discountType, setDiscountType] = React.useState<'percent' | 'fixed'>('percent');
-  const [shippingFee, setShippingFee] = React.useState(0);
+  const [discountType, setDiscountType] = React.useState<'percent' | 'fixed'>('fixed');
+  const [shippingFee, setShippingFee] = React.useState(editing?.shipping_fee ?? 0);
+  const [depositAmount, setDepositAmount] = React.useState(editing?.deposit_amount ?? 0);
   const [saving, setSaving] = React.useState(false);
 
-  const [lines, setLines] = React.useState<DraftLine[]>([
-    { _key: crypto.randomUUID(), product_id: '', product_name: '', quantity: 1, unit_price: 0, discount_pct: 0 },
-  ]);
+  const [lines, setLines] = React.useState<DraftLine[]>(
+    editingItems ?? [
+      { _key: crypto.randomUUID(), product_id: '', product_name: '', quantity: 1, unit_price: 0, discount_pct: 0 },
+    ],
+  );
+
+  React.useEffect(() => {
+    if (editing) {
+      setDiscountValue(editing.discount_amount);
+      setDiscountType('fixed');
+    }
+  }, [editing]);
 
   function addLine() {
     setLines((prev) => [
@@ -104,10 +130,6 @@ export function SalesOrderForm({
   const needsApproval = totals.total > APPROVAL_THRESHOLD;
 
   async function handleSave() {
-    if (!customerId) {
-      toast.error('Vui lòng chọn khách hàng');
-      return;
-    }
     const validLines = lines.filter((l) => l.product_id && l.quantity > 0);
     if (validLines.length === 0) {
       toast.error('Đơn cần ít nhất 1 sản phẩm hợp lệ');
@@ -116,31 +138,49 @@ export function SalesOrderForm({
 
     setSaving(true);
     try {
-      const result = await createSalesOrder({
-        customer_id: customerId,
-        order_date: orderDate,
-        delivery_address: deliveryAddress,
-        notes,
-        items: validLines.map((l) => ({
-          product_id: l.product_id,
-          product_name: l.product_name,
-          quantity: l.quantity,
-          unit_price: l.unit_price,
-          discount_pct: l.discount_pct,
-        })),
-        order_discount_value: discountValue,
-        order_discount_type: discountType,
-        shipping_fee: shippingFee,
-      });
-
-      if (!result.ok) {
-        toast.error(result.error ?? 'Tạo đơn thất bại');
-        return;
+      if (isEdit && editing) {
+        const result = await updateSalesOrder({
+          order_id: editing.id,
+          delivery_address: deliveryAddress,
+          notes,
+          items: validLines.map((l) => ({
+            product_id: l.product_id,
+            product_name: l.product_name,
+            quantity: l.quantity,
+            unit_price: l.unit_price,
+            discount_pct: l.discount_pct,
+          })),
+          order_discount_value: discountValue,
+          order_discount_type: discountType,
+          shipping_fee: shippingFee,
+          deposit_amount: depositAmount,
+        } satisfies UpdateSODraft);
+        if (!result.ok) { toast.error(result.error ?? 'Cập nhật thất bại'); return; }
+        toast.success('Đã cập nhật đơn');
+      } else {
+        if (!customerId) { toast.error('Vui lòng chọn khách hàng'); return; }
+        const result = await createSalesOrder({
+          customer_id: customerId,
+          order_date: orderDate,
+          delivery_address: deliveryAddress,
+          notes,
+          items: validLines.map((l) => ({
+            product_id: l.product_id,
+            product_name: l.product_name,
+            quantity: l.quantity,
+            unit_price: l.unit_price,
+            discount_pct: l.discount_pct,
+          })),
+          order_discount_value: discountValue,
+          order_discount_type: discountType,
+          shipping_fee: shippingFee,
+          deposit_amount: depositAmount,
+        });
+        if (!result.ok) { toast.error(result.error ?? 'Tạo đơn thất bại'); return; }
+        toast.success(
+          `Đã tạo đơn ${result.data?.code}` + (needsApproval ? ' — đang chờ duyệt' : ''),
+        );
       }
-      toast.success(
-        `Đã tạo đơn ${result.data?.code}` +
-          (needsApproval ? ' — đang chờ duyệt' : ''),
-      );
       onClose();
       router.refresh();
     } finally {
@@ -154,14 +194,18 @@ export function SalesOrderForm({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <Label>Khách hàng <span className="text-destructive">*</span></Label>
-          <EntityCombobox
-            options={customers}
-            value={customerId}
-            onChange={setCustomerId}
-            entityLabel="khách hàng"
-            placeholder="Chọn hoặc tạo khách hàng"
-            onCreate={onQuickCreateCustomer}
-          />
+          {isEdit ? (
+            <Input value={customers.find((c) => c.id === customerId)?.label ?? ''} readOnly className="bg-muted" />
+          ) : (
+            <EntityCombobox
+              options={customers}
+              value={customerId}
+              onChange={setCustomerId}
+              entityLabel="khách hàng"
+              placeholder="Chọn hoặc tạo khách hàng"
+              onCreate={onQuickCreateCustomer}
+            />
+          )}
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="order_date">Ngày đặt</Label>
@@ -169,6 +213,8 @@ export function SalesOrderForm({
             id="order_date"
             type="date"
             value={orderDate}
+            readOnly={isEdit}
+            className={isEdit ? 'bg-muted' : ''}
             onChange={(e) => setOrderDate(e.target.value)}
           />
         </div>
@@ -322,6 +368,16 @@ export function SalesOrderForm({
             />
           </div>
           <div className="space-y-1.5">
+            <Label htmlFor="deposit_amount">Tiền cọc từ khách (VND)</Label>
+            <Input
+              id="deposit_amount"
+              type="number"
+              step={100000}
+              value={depositAmount}
+              onChange={(e) => setDepositAmount(Math.max(0, Number(e.target.value)))}
+            />
+          </div>
+          <div className="space-y-1.5">
             <Label htmlFor="notes">Ghi chú</Label>
             <Textarea
               id="notes"
@@ -350,6 +406,18 @@ export function SalesOrderForm({
               <span>Tổng cộng</span>
               <span>{vnd(totals.total)}</span>
             </div>
+            {depositAmount > 0 && (
+              <div className="flex justify-between text-sm text-green-700">
+                <span>Tiền cọc đã nhận</span>
+                <span>− {vnd(depositAmount)}</span>
+              </div>
+            )}
+            {depositAmount > 0 && (
+              <div className="flex justify-between text-sm font-medium">
+                <span>Còn lại</span>
+                <span>{vnd(Math.max(0, totals.total - depositAmount))}</span>
+              </div>
+            )}
             {needsApproval && (
               <p className="rounded bg-amber-50 px-2 py-1.5 text-xs text-amber-700">
                 Đơn vượt {vnd(APPROVAL_THRESHOLD)} — sẽ cần quản lý duyệt.
@@ -365,7 +433,7 @@ export function SalesOrderForm({
         </Button>
         <Button type="button" onClick={handleSave} disabled={saving}>
           {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-          Tạo đơn
+          {isEdit ? 'Lưu thay đổi' : 'Tạo đơn'}
         </Button>
       </div>
     </div>

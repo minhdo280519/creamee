@@ -31,6 +31,7 @@ interface PORow {
   paid_cny: number;
   status: string;
   payment_status: string;
+  so_code?: string | null;
   supplier?: { name: string } | null;
 }
 
@@ -49,17 +50,24 @@ const PAY_STATUS: Record<string, { label: string; variant: 'destructive' | 'warn
 };
 const STATUS_FLOW = ['draft', 'sent', 'confirmed', 'shipping', 'received'];
 
+interface SOOption {
+  id: string;
+  code: string;
+  customer_name: string;
+}
+
 interface Props {
   orders: PORow[];
   suppliers: EntityOption[];
   products: { id: string; label: string }[];
+  salesOrders: SOOption[];
   defaultFxRate: number;
   canEdit: boolean;
   onQuickCreateSupplier: (name: string) => Promise<EntityOption>;
 }
 
 export function POClient({
-  orders, suppliers, products, defaultFxRate, canEdit, onQuickCreateSupplier,
+  orders, suppliers, products, salesOrders, defaultFxRate, canEdit, onQuickCreateSupplier,
 }: Props) {
   const router = useRouter();
   const [query, setQuery] = React.useState('');
@@ -137,6 +145,7 @@ export function POClient({
               <TableRow>
                 <TableHead>Mã PO</TableHead>
                 <TableHead>Nhà cung cấp</TableHead>
+                <TableHead>Đơn bán</TableHead>
                 <TableHead>Ngày đặt</TableHead>
                 <TableHead className="text-right">Tổng (¥)</TableHead>
                 <TableHead className="text-right">Quy VND</TableHead>
@@ -153,6 +162,9 @@ export function POClient({
                   <TableRow key={o.id}>
                     <TableCell className="font-medium">{o.code}</TableCell>
                     <TableCell>{o.supplier?.name ?? '—'}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs">
+                      {o.so_code ?? '—'}
+                    </TableCell>
                     <TableCell>{formatDate(o.order_date)}</TableCell>
                     <TableCell className="text-right">{cny(o.total_cny)}</TableCell>
                     <TableCell className="text-right font-medium">
@@ -206,13 +218,14 @@ export function POClient({
       )}
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
-        <DialogContent className="max-w-4xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Tạo đơn nhập hàng (PO)</DialogTitle>
           </DialogHeader>
           <POForm
             suppliers={suppliers}
             products={products}
+            salesOrders={salesOrders}
             defaultFxRate={defaultFxRate}
             onQuickCreateSupplier={onQuickCreateSupplier}
             onClose={() => setFormOpen(false)}

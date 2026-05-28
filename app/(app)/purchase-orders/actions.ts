@@ -16,6 +16,8 @@ export interface POLineDraft {
 
 export interface CreatePODraft {
   supplier_id: string;
+  so_id?: string;
+  so_code?: string;
   order_date: string;
   expected_arrival_date?: string;
   fx_rate: number;
@@ -52,11 +54,13 @@ export async function createPurchaseOrder(
 
   const { affectedRows } = await query(
     `INSERT INTO purchase_orders
-     (id, code, supplier_id, order_date, expected_arrival_date, currency, fx_rate,
+     (id, code, supplier_id, so_id, so_code, order_date, expected_arrival_date, currency, fx_rate,
       subtotal_cny, shipping_cny, total_cny, total_vnd, status, payment_status, notes, created_by)
-     VALUES (?, ?, ?, ?, ?, 'CNY', ?, ?, ?, ?, ?, 'draft', 'unpaid', ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'CNY', ?, ?, ?, ?, ?, 'draft', 'unpaid', ?, ?)`,
     [
-      id, code, draft.supplier_id, draft.order_date,
+      id, code, draft.supplier_id,
+      draft.so_id || null, draft.so_code || null,
+      draft.order_date,
       draft.expected_arrival_date || null, draft.fx_rate,
       subtotalCny, draft.shipping_cny, totalCny, totalVnd,
       draft.notes || null, profile.id,

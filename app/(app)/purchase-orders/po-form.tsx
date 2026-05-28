@@ -24,9 +24,16 @@ interface ProductOption {
   label: string;
 }
 
+interface SOOption {
+  id: string;
+  code: string;
+  customer_name: string;
+}
+
 interface Props {
   suppliers: EntityOption[];
   products: ProductOption[];
+  salesOrders: SOOption[];
   /** Tỷ giá CNY→VND mặc định từ app_settings. */
   defaultFxRate: number;
   onQuickCreateSupplier: (name: string) => Promise<EntityOption>;
@@ -42,10 +49,11 @@ interface DraftLine {
 }
 
 export function POForm({
-  suppliers, products, defaultFxRate, onQuickCreateSupplier, onClose,
+  suppliers, products, salesOrders, defaultFxRate, onQuickCreateSupplier, onClose,
 }: Props) {
   const router = useRouter();
   const [supplierId, setSupplierId] = React.useState<string | null>(null);
+  const [selectedSoId, setSelectedSoId] = React.useState<string>('');
   const [orderDate, setOrderDate] = React.useState(
     new Date().toISOString().slice(0, 10),
   );
@@ -96,8 +104,11 @@ export function POForm({
     }
     setSaving(true);
     try {
+      const selectedSo = salesOrders.find((s) => s.id === selectedSoId);
       const r = await createPurchaseOrder({
         supplier_id: supplierId,
+        so_id: selectedSo?.id || undefined,
+        so_code: selectedSo?.code || undefined,
         order_date: orderDate,
         expected_arrival_date: arrivalDate || undefined,
         fx_rate: fxRate,
@@ -135,6 +146,22 @@ export function POForm({
             placeholder="Chọn hoặc tạo NCC"
             onCreate={onQuickCreateSupplier}
           />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Đơn bán hàng liên quan (SO)</Label>
+          <Select value={selectedSoId} onValueChange={setSelectedSoId}>
+            <SelectTrigger>
+              <SelectValue placeholder="Chọn SO (tuỳ chọn)" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">— Không gắn SO —</SelectItem>
+              {salesOrders.map((s) => (
+                <SelectItem key={s.id} value={s.id}>
+                  {s.code} · {s.customer_name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="po_date">Ngày đặt</Label>
