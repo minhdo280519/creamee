@@ -91,6 +91,7 @@ const KT = ['accountant_lead', 'accountant'] as const;
 export const ROUTE_ACCESS: Record<string, Role[]> = {
   '/dashboard':      [...STAFF_ROLES],
   '/customers':      ['owner', 'manager', 'sales', ...KT],
+  '/leads':          ['owner', 'manager', 'sales', ...KT],
   '/products':       [...STAFF_ROLES],
   '/inventory-lots': ['owner', 'manager', 'warehouse', ...KT],
   '/suppliers':      ['owner', 'manager', 'warehouse', ...KT],

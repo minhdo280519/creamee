@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, ShoppingCart, Truck, Package, Wallet, Settings,
-  Users, Store, TrendingUp, BoxIcon, BarChart3, DollarSign,
+  Users, Store, TrendingUp, BoxIcon, BarChart3, DollarSign, UserPlus,
   ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen,
   type LucideIcon,
 } from 'lucide-react';
@@ -20,6 +20,7 @@ const SECTION_ICONS: Record<string, LucideIcon> = {
 const ITEM_ICONS: Record<string, LucideIcon> = {
   '/sales-orders': ShoppingCart,
   '/customers': Users,
+  '/leads': UserPlus,
   '/deals': TrendingUp,
   '/purchase-orders': Truck,
   '/suppliers': Store,

@@ -41,6 +41,7 @@ export const NAV_TREE: NavSection[] = [
     items: [
       { href: '/sales-orders', label: 'Đơn bán hàng' },
       { href: '/customers', label: 'Khách hàng' },
+      { href: '/leads', label: 'Leads & Tiềm năng' },
       { href: '/deals', label: 'Cơ hội bán hàng' },
     ],
   },

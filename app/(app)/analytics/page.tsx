@@ -9,26 +9,63 @@ export const metadata = { title: 'Báo cáo — CREAMEE ERP' };
 
 export default async function AnalyticsPage() {
   const profile = await requireAccess('/analytics');
-
-  const { rows: monthly } = await query<MonthlyPnL>(
-    `SELECT
-       DATE_FORMAT(order_date, '%Y-%m') AS month,
-       SUM(total) AS revenue,
-       NULL AS goods_cogs,
-       NULL AS ship_cogs,
-       NULL AS cogs,
-       NULL AS operating_expenses,
-       NULL AS gross_profit_before_ship,
-       NULL AS gross_profit,
-       NULL AS net_profit
-     FROM sales_orders
-     WHERE status NOT IN ('cancelled','draft')
-       AND order_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
-     GROUP BY month
-     ORDER BY month`,
-  );
-
   const showCost = canViewCost(profile.role as Role);
+
+  const [{ rows: monthly }, { rows: topCustomers }, { rows: topProducts }] = await Promise.all([
+    // P&L tháng: doanh thu + COGS từ sản phẩm
+    query<MonthlyPnL>(
+      `SELECT
+         DATE_FORMAT(so.order_date, '%Y-%m') AS month,
+         SUM(so.total) AS revenue,
+         COALESCE(SUM(soi.quantity * p.goods_cost_vnd), 0) AS goods_cogs,
+         COALESCE(SUM(soi.quantity * p.ship_cost_vnd), 0)  AS ship_cogs,
+         COALESCE(SUM(soi.quantity * p.cost_vnd), 0)       AS cogs,
+         NULL AS operating_expenses,
+         COALESCE(SUM(so.total) - SUM(soi.quantity * COALESCE(p.goods_cost_vnd, 0)), 0)
+           AS gross_profit_before_ship,
+         COALESCE(SUM(so.total) - SUM(soi.quantity * COALESCE(p.cost_vnd, 0)), 0)
+           AS gross_profit,
+         NULL AS net_profit
+       FROM sales_orders so
+       LEFT JOIN sales_order_items soi ON soi.order_id = so.id
+       LEFT JOIN products p ON soi.product_id = p.id
+       WHERE so.status NOT IN ('cancelled', 'draft')
+         AND so.order_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+       GROUP BY month
+       ORDER BY month`,
+    ),
+
+    // Top 5 khách hàng theo doanh thu 12 tháng
+    query<{ customer_name: string; total: number; order_count: number }>(
+      `SELECT
+         COALESCE(c.name, so.customer_name_snapshot, '—') AS customer_name,
+         SUM(so.total) AS total,
+         COUNT(*) AS order_count
+       FROM sales_orders so
+       LEFT JOIN customers c ON so.customer_id = c.id
+       WHERE so.status NOT IN ('cancelled','draft')
+         AND so.order_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+       GROUP BY so.customer_id, customer_name
+       ORDER BY total DESC
+       LIMIT 5`,
+    ),
+
+    // Top 5 sản phẩm bán chạy 12 tháng
+    query<{ product_name: string; qty: number; revenue: number }>(
+      `SELECT
+         COALESCE(p.name, soi.product_name_snapshot, '—') AS product_name,
+         SUM(soi.quantity) AS qty,
+         SUM(soi.quantity * soi.unit_price) AS revenue
+       FROM sales_order_items soi
+       JOIN sales_orders so ON soi.order_id = so.id
+       LEFT JOIN products p ON soi.product_id = p.id
+       WHERE so.status NOT IN ('cancelled','draft')
+         AND so.order_date >= DATE_SUB(NOW(), INTERVAL 12 MONTH)
+       GROUP BY soi.product_id, product_name
+       ORDER BY qty DESC
+       LIMIT 5`,
+    ),
+  ]);
 
   return (
     <div>
@@ -37,17 +74,9 @@ export default async function AnalyticsPage() {
         description="Tình hình kinh doanh 12 tháng gần nhất"
       />
       <AnalyticsClient
-        monthly={monthly.map((m) => ({
-          month: m.month,
-          revenue: m.revenue,
-          goods_cogs: m.goods_cogs,
-          ship_cogs: m.ship_cogs,
-          cogs: m.cogs,
-          operating_expenses: m.operating_expenses,
-          gross_profit_before_ship: m.gross_profit_before_ship,
-          gross_profit: m.gross_profit,
-          net_profit: m.net_profit,
-        }))}
+        monthly={monthly}
+        topCustomers={topCustomers}
+        topProducts={topProducts}
         canViewCost={showCost}
       />
     </div>
