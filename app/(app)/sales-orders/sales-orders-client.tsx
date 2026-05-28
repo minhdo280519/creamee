@@ -200,8 +200,8 @@ export function SalesOrdersClient({
                           </Button>
                         </>
                       )}
-                      {/* Giao hàng — đơn đã duyệt, chưa giao. */}
-                      {o.status === 'approved' && (
+                      {/* Giao hàng — đơn đã duyệt hoặc giao một phần. */}
+                      {['approved', 'partial_delivered'].includes(o.status) && (
                         <Button
                           size="sm"
                           variant="outline"

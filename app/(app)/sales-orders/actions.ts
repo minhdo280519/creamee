@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { query } from '@/lib/db';
 import { requireUser } from '@/lib/auth';
-import { generateCode, suggestFifoAllocation, deliverOrderWithAllocation, restoreLotsForOrder } from '@/lib/db/helpers';
+import { generateCode, restoreLotsForOrder } from '@/lib/db/helpers';
 import { canApproveOrder, type Role } from '@/lib/roles';
 import {
   calcOrderTotal, checkApprovalNeeded, checkCreditLimit,
@@ -44,20 +44,16 @@ export interface UpdateSODraft {
   deposit_amount?: number;
 }
 
-export interface AllocLine {
-  lot_id: string | null;
-  lot_code: string;
-  qty: number;
-  goods_unit_cost: number;
-  ship_unit_cost: number;
-  is_negative: boolean;
-}
-export interface ItemAllocation {
-  order_item_id: string;
-  product_id: string;
+export interface SODeliveryItem {
+  item_id: string;
   product_name: string;
   quantity: number;
-  lines: AllocLine[];
+  delivered_qty: number;
+}
+
+export interface DeliveryLine {
+  item_id: string;
+  qty_now: number;
 }
 
 /**
@@ -184,59 +180,63 @@ export async function approveSalesOrder(orderId: string): Promise<ActionResult> 
   return { ok: true };
 }
 
-/**
- * Lấy gợi ý phân bổ FIFO cho toàn đơn.
- */
-export async function getFifoSuggestion(
-  orderId: string,
-): Promise<{ ok: boolean; error?: string; items?: ItemAllocation[] }> {
+/** Lấy danh sách sản phẩm trong SO để giao hàng. */
+export async function getSOItemsForDelivery(orderId: string): Promise<{
+  ok: boolean;
+  items?: SODeliveryItem[];
+  error?: string;
+}> {
   await requireUser();
-
-  const { rows: items } = await query<{
-    id: string; product_id: string; product_name_snapshot: string; quantity: number;
+  const { rows } = await query<{
+    id: string; product_name_snapshot: string; quantity: number; delivered_qty: number;
   }>(
-    'SELECT id, product_id, product_name_snapshot, quantity FROM sales_order_items WHERE order_id = ?',
+    `SELECT id, product_name_snapshot, quantity, delivered_qty
+     FROM sales_order_items WHERE order_id = ? ORDER BY sort_order`,
     [orderId],
   );
-
-  if (!items || items.length === 0) {
-    return { ok: false, error: 'Đơn không có sản phẩm' };
-  }
-
-  const result: ItemAllocation[] = [];
-  for (const it of items) {
-    const alloc = await suggestFifoAllocation(it.product_id, it.quantity);
-    result.push({
-      order_item_id: it.id,
-      product_id: it.product_id,
-      product_name: it.product_name_snapshot,
-      quantity: it.quantity,
-      lines: alloc,
-    });
-  }
-
-  return { ok: true, items: result };
+  return {
+    ok: true,
+    items: rows.map((r) => ({
+      item_id: r.id,
+      product_name: r.product_name_snapshot,
+      quantity: Number(r.quantity),
+      delivered_qty: Number(r.delivered_qty),
+    })),
+  };
 }
 
-/**
- * Giao hàng — xuất kho theo phân bổ đã xác nhận.
- */
-export async function deliverOrder(
+/** Cập nhật số lượng đã giao cho từng sản phẩm trong SO. */
+export async function markDelivered(
   orderId: string,
-  allocation: ItemAllocation[],
+  lines: DeliveryLine[],
 ): Promise<ActionResult> {
   await requireUser();
 
-  try {
-    await deliverOrderWithAllocation(orderId, allocation);
-  } catch (err) {
-    return { ok: false, error: `Xuất kho thất bại: ${err instanceof Error ? err.message : String(err)}` };
+  const toDeliver = lines.filter((l) => l.qty_now > 0);
+  if (toDeliver.length === 0) return { ok: false, error: 'Không có sản phẩm nào được giao' };
+
+  for (const l of toDeliver) {
+    await query(
+      `UPDATE sales_order_items
+       SET delivered_qty = delivered_qty + ?
+       WHERE id = ? AND order_id = ?`,
+      [l.qty_now, l.item_id, orderId],
+    );
   }
 
+  const { rows } = await query<{ quantity: number; delivered_qty: number }>(
+    'SELECT quantity, delivered_qty FROM sales_order_items WHERE order_id = ?',
+    [orderId],
+  );
+
+  const allDelivered = rows.every((r) => Number(r.delivered_qty) >= Number(r.quantity));
+  const anyDelivered = rows.some((r) => Number(r.delivered_qty) > 0);
+  const newStatus = allDelivered ? 'delivered' : anyDelivered ? 'partial_delivered' : 'approved';
+
+  await query('UPDATE sales_orders SET status = ? WHERE id = ?', [newStatus, orderId]);
+
   revalidatePath('/sales-orders');
-  revalidatePath(`/sales-orders/${orderId}`);
-  revalidatePath('/products');
-  revalidatePath('/inventory-lots');
+  revalidatePath('/warehouse');
   return { ok: true };
 }
 
