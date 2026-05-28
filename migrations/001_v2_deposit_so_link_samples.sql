@@ -1,9 +1,7 @@
 -- ============================================================
--- CREAMEE ERP v7 — Migration v2
--- Chạy trên VPS: mysql -u creamee -p creamee < migrate-v2.sql
+-- CREAMEE ERP v7 — Migration 001 (= migrate-v2.sql cũ)
+-- An toàn re-run nhờ IF NOT EXISTS / ON DUPLICATE KEY UPDATE.
 -- ============================================================
-
-USE creamee;
 
 -- 1. Đơn bán hàng: thêm tiền cọc từ khách
 ALTER TABLE sales_orders
@@ -64,5 +62,3 @@ CREATE TABLE IF NOT EXISTS samples (
 
 INSERT INTO code_sequences (prefix, last_val) VALUES ('MAU', 0)
 ON DUPLICATE KEY UPDATE last_val = last_val;
-
-SELECT 'Migration v2 hoàn thành!' AS result;

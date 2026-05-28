@@ -61,6 +61,8 @@ jobs:
           cd /opt/creamee
           echo "→ Pull code mới..."
           git pull origin main
+          echo "→ Chạy DB migrations..."
+          bash migrations/run.sh
           echo "→ Cài dependencies..."
           npm ci
           echo "→ Build Next.js..."
