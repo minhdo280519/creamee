@@ -4,6 +4,7 @@ import { type Role } from '@/lib/roles';
 import { PageHeader } from '@/components/page-header';
 import { SamplesClient } from './samples-client';
 import { quickCreateCustomer } from '@/app/(app)/customers/actions';
+import { quickCreateSupplier, quickCreateProduct } from '@/app/(app)/products/actions';
 import type { SampleWithRelations } from '@/lib/types';
 
 export const metadata = { title: 'Quản lý mẫu — CREAMEE ERP' };
@@ -109,6 +110,8 @@ export default async function SamplesPage() {
         defaultFxRate={defaultFxRate}
         canEdit={canEdit}
         onQuickCreateCustomer={quickCreateCustomer}
+        onQuickCreateSupplier={quickCreateSupplier}
+        onQuickCreateProduct={quickCreateProduct}
       />
     </div>
   );

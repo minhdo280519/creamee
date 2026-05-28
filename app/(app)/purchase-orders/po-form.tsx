@@ -34,9 +34,9 @@ interface Props {
   suppliers: EntityOption[];
   products: ProductOption[];
   salesOrders: SOOption[];
-  /** Tỷ giá CNY→VND mặc định từ app_settings. */
   defaultFxRate: number;
   onQuickCreateSupplier: (name: string) => Promise<EntityOption>;
+  onQuickCreateProduct: (name: string) => Promise<EntityOption>;
   onClose: () => void;
 }
 
@@ -49,7 +49,8 @@ interface DraftLine {
 }
 
 export function POForm({
-  suppliers, products, salesOrders, defaultFxRate, onQuickCreateSupplier, onClose,
+  suppliers, products, salesOrders, defaultFxRate,
+  onQuickCreateSupplier, onQuickCreateProduct, onClose,
 }: Props) {
   const router = useRouter();
   const [supplierId, setSupplierId] = React.useState<string | null>(null);
@@ -62,6 +63,8 @@ export function POForm({
   const [shippingCny, setShippingCny] = React.useState(0);
   const [notes, setNotes] = React.useState('');
   const [saving, setSaving] = React.useState(false);
+
+  const productMapRef = React.useRef(new Map(products.map((p) => [p.id, p.label])));
 
   const [lines, setLines] = React.useState<DraftLine[]>([
     { _key: crypto.randomUUID(), product_id: '', product_name: '', quantity: 1, unit_cost_cny: 0 },
@@ -79,9 +82,10 @@ export function POForm({
   function updateLine(key: string, patch: Partial<DraftLine>) {
     setLines((p) => p.map((l) => (l._key === key ? { ...l, ...patch } : l)));
   }
-  function pickProduct(key: string, id: string) {
-    const p = products.find((x) => x.id === id);
-    if (p) updateLine(key, { product_id: id, product_name: p.label });
+  function pickProduct(key: string, id: string | null) {
+    if (!id) { updateLine(key, { product_id: '', product_name: '' }); return; }
+    const label = productMapRef.current.get(id) ?? '';
+    updateLine(key, { product_id: id, product_name: label });
   }
 
   // Tổng tiền realtime.
@@ -217,21 +221,18 @@ export function POForm({
               {lines.map((line) => (
                 <TableRow key={line._key}>
                   <TableCell>
-                    <Select
-                      value={line.product_id}
-                      onValueChange={(v) => pickProduct(line._key, v)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Chọn sản phẩm" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {products.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <EntityCombobox
+                      options={products}
+                      value={line.product_id || null}
+                      onChange={(id) => pickProduct(line._key, id)}
+                      entityLabel="sản phẩm"
+                      placeholder="Chọn sản phẩm"
+                      onCreate={async (name) => {
+                        const created = await onQuickCreateProduct(name);
+                        productMapRef.current.set(created.id, created.label);
+                        return created;
+                      }}
+                    />
                   </TableCell>
                   <TableCell>
                     <Input

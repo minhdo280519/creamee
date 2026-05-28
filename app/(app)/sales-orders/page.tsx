@@ -4,6 +4,7 @@ import { canApproveOrder, type Role } from '@/lib/roles';
 import { PageHeader } from '@/components/page-header';
 import { SalesOrdersClient } from './sales-orders-client';
 import { quickCreateCustomer } from '@/app/(app)/customers/actions';
+import { quickCreateProduct } from '@/app/(app)/products/actions';
 import type { SalesOrderWithCustomer } from '@/lib/types';
 
 export const metadata = { title: 'Đơn bán — CREAMEE ERP' };
@@ -79,6 +80,7 @@ export default async function SalesOrdersPage() {
         canCreate={canCreate}
         canApprove={canApprove}
         onQuickCreateCustomer={quickCreateCustomer}
+        onQuickCreateProduct={quickCreateProduct}
       />
     </div>
   );

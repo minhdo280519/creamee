@@ -84,6 +84,29 @@ export async function updateProduct(
 }
 
 /**
+ * Tạo nhanh sản phẩm chỉ với tên — cho EntityCombobox auto-add.
+ */
+export async function quickCreateProduct(name: string): Promise<{ id: string; label: string }> {
+  await requireUser();
+
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Tên sản phẩm trống');
+
+  const { rows: cnt } = await query<{ cnt: number }>('SELECT COUNT(*) AS cnt FROM products');
+  const sku = 'SP' + String((cnt[0]?.cnt ?? 0) + 1).padStart(4, '0');
+  const id = crypto.randomUUID();
+
+  await query(
+    `INSERT INTO products (id, sku, name, base_price_vnd, reorder_point, reorder_qty, is_active)
+     VALUES (?, ?, ?, 0, 0, 0, 1)`,
+    [id, sku, trimmed],
+  );
+
+  revalidatePath('/products');
+  return { id, label: trimmed };
+}
+
+/**
  * Tạo nhanh nhà cung cấp chỉ với tên — cho EntityCombobox auto-add.
  */
 export async function quickCreateSupplier(

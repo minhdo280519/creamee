@@ -3,7 +3,7 @@ import { query } from '@/lib/db';
 import { type Role } from '@/lib/roles';
 import { PageHeader } from '@/components/page-header';
 import { POClient } from './po-client';
-import { quickCreateSupplier } from '@/app/(app)/products/actions';
+import { quickCreateSupplier, quickCreateProduct } from '@/app/(app)/products/actions';
 
 export const metadata = { title: 'Đơn nhập hàng — CREAMEE ERP' };
 
@@ -68,6 +68,7 @@ export default async function PurchaseOrdersPage() {
         defaultFxRate={defaultFxRate}
         canEdit={canEdit}
         onQuickCreateSupplier={quickCreateSupplier}
+        onQuickCreateProduct={quickCreateProduct}
       />
     </div>
   );

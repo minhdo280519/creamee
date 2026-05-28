@@ -42,10 +42,9 @@ interface EditingOrder {
 interface Props {
   customers: EntityOption[];
   products: ProductOption[];
-  /** Tạo nhanh khách hàng cho combobox auto-add. */
   onQuickCreateCustomer: (name: string) => Promise<EntityOption>;
+  onQuickCreateProduct: (name: string) => Promise<EntityOption>;
   onClose: () => void;
-  /** Nếu có → chế độ sửa. */
   editing?: EditingOrder;
   editingItems?: DraftLine[];
 }
@@ -58,7 +57,7 @@ interface DraftLine extends SOLineDraft {
 const APPROVAL_THRESHOLD = 50_000_000;
 
 export function SalesOrderForm({
-  customers, products, onQuickCreateCustomer, onClose, editing, editingItems,
+  customers, products, onQuickCreateCustomer, onQuickCreateProduct, onClose, editing, editingItems,
 }: Props) {
   const router = useRouter();
   const isEdit = !!editing;
@@ -73,6 +72,9 @@ export function SalesOrderForm({
   const [shippingFee, setShippingFee] = React.useState(editing?.shipping_fee ?? 0);
   const [depositAmount, setDepositAmount] = React.useState(editing?.deposit_amount ?? 0);
   const [saving, setSaving] = React.useState(false);
+
+  // Ref để track sản phẩm mới tạo inline (tránh stale closure)
+  const productMapRef = React.useRef(new Map(products.map((p) => [p.id, p])));
 
   const [lines, setLines] = React.useState<DraftLine[]>(
     editingItems ?? [
@@ -103,13 +105,13 @@ export function SalesOrderForm({
   }
 
   // Chọn sản phẩm → tự điền tên + giá sỉ (ưu tiên) hoặc giá lẻ.
-  function pickProduct(key: string, productId: string) {
-    const p = products.find((x) => x.id === productId);
-    if (!p) return;
+  function pickProduct(key: string, id: string | null) {
+    if (!id) { updateLine(key, { product_id: '', product_name: '' }); return; }
+    const p = productMapRef.current.get(id);
     updateLine(key, {
-      product_id: productId,
-      product_name: p.label,
-      unit_price: p.wholesale_price_vnd ?? p.base_price_vnd,
+      product_id: id,
+      product_name: p?.label ?? '',
+      unit_price: p ? (p.wholesale_price_vnd ?? p.base_price_vnd) : 0,
     });
   }
 
@@ -257,21 +259,21 @@ export function SalesOrderForm({
                 return (
                   <TableRow key={line._key}>
                     <TableCell>
-                      <Select
-                        value={line.product_id}
-                        onValueChange={(v) => pickProduct(line._key, v)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Chọn sản phẩm" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {products.map((p) => (
-                            <SelectItem key={p.id} value={p.id}>
-                              {p.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <EntityCombobox
+                        options={products}
+                        value={line.product_id || null}
+                        onChange={(id) => pickProduct(line._key, id)}
+                        entityLabel="sản phẩm"
+                        placeholder="Chọn sản phẩm"
+                        onCreate={async (name) => {
+                          const created = await onQuickCreateProduct(name);
+                          productMapRef.current.set(created.id, {
+                            id: created.id, label: created.label,
+                            base_price_vnd: 0, wholesale_price_vnd: null,
+                          });
+                          return created;
+                        }}
+                      />
                     </TableCell>
                     <TableCell>
                       <Input

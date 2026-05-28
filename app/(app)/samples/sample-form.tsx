@@ -14,9 +14,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import { EntityCombobox, type EntityOption } from '@/components/entity-combobox';
 
 interface Props {
@@ -27,13 +24,15 @@ interface Props {
   editing?: SampleWithRelations;
   onClose: () => void;
   onQuickCreateCustomer: (name: string) => Promise<EntityOption>;
+  onQuickCreateSupplier: (name: string) => Promise<EntityOption>;
+  onQuickCreateProduct: (name: string) => Promise<EntityOption>;
 }
 
 const DEFAULT_DEPOSIT = 3_500_000;
 
 export function SampleForm({
   customers, suppliers, products, defaultFxRate,
-  editing, onClose, onQuickCreateCustomer,
+  editing, onClose, onQuickCreateCustomer, onQuickCreateSupplier, onQuickCreateProduct,
 }: Props) {
   const router = useRouter();
   const isEdit = !!editing;
@@ -53,10 +52,14 @@ export function SampleForm({
   const [notes, setNotes] = React.useState(editing?.notes ?? '');
   const [saving, setSaving] = React.useState(false);
 
-  function pickProduct(id: string) {
-    setProductId(id);
-    const p = products.find((x) => x.id === id);
-    if (p) setProductName(p.label);
+  const productMapRef = React.useRef(new Map(products.map((p) => [p.id, p.label])));
+
+  function pickProduct(id: string | null) {
+    setProductId(id ?? '');
+    if (id) {
+      const label = productMapRef.current.get(id) ?? '';
+      if (label) setProductName(label);
+    }
   }
 
   const totalCostVnd = goodsCostVnd + shipCostVnd + sampleFeeVnd + otherCostVnd;
@@ -136,33 +139,31 @@ export function SampleForm({
         {/* Nhà cung cấp */}
         <div className="space-y-1.5">
           <Label>Nhà cung cấp</Label>
-          <Select value={supplierId} onValueChange={setSupplierId}>
-            <SelectTrigger>
-              <SelectValue placeholder="Chọn NCC (tuỳ chọn)" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">— Chưa có NCC —</SelectItem>
-              {suppliers.map((s) => (
-                <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <EntityCombobox
+            options={suppliers}
+            value={supplierId || null}
+            onChange={(id) => setSupplierId(id ?? '')}
+            entityLabel="nhà cung cấp"
+            placeholder="Chọn hoặc tạo NCC"
+            onCreate={onQuickCreateSupplier}
+          />
         </div>
 
         {/* Sản phẩm mẫu */}
         <div className="space-y-1.5">
           <Label>Sản phẩm trong hệ thống (tuỳ chọn)</Label>
-          <Select value={productId} onValueChange={pickProduct}>
-            <SelectTrigger>
-              <SelectValue placeholder="Gắn với sản phẩm có sẵn" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">— Không gắn —</SelectItem>
-              {products.map((p) => (
-                <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <EntityCombobox
+            options={products}
+            value={productId || null}
+            onChange={pickProduct}
+            entityLabel="sản phẩm"
+            placeholder="Gắn với sản phẩm có sẵn"
+            onCreate={async (name) => {
+              const created = await onQuickCreateProduct(name);
+              productMapRef.current.set(created.id, created.label);
+              return created;
+            }}
+          />
         </div>
 
         {/* Tên sản phẩm mẫu */}

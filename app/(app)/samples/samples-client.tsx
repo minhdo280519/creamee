@@ -39,10 +39,13 @@ interface Props {
   defaultFxRate: number;
   canEdit: boolean;
   onQuickCreateCustomer: (name: string) => Promise<EntityOption>;
+  onQuickCreateSupplier: (name: string) => Promise<EntityOption>;
+  onQuickCreateProduct: (name: string) => Promise<EntityOption>;
 }
 
 export function SamplesClient({
-  samples, customers, suppliers, products, defaultFxRate, canEdit, onQuickCreateCustomer,
+  samples, customers, suppliers, products, defaultFxRate, canEdit,
+  onQuickCreateCustomer, onQuickCreateSupplier, onQuickCreateProduct,
 }: Props) {
   const router = useRouter();
   const [query, setQuery] = React.useState('');
@@ -236,6 +239,8 @@ export function SamplesClient({
             defaultFxRate={defaultFxRate}
             onClose={() => setFormOpen(false)}
             onQuickCreateCustomer={onQuickCreateCustomer}
+            onQuickCreateSupplier={onQuickCreateSupplier}
+            onQuickCreateProduct={onQuickCreateProduct}
           />
         </DialogContent>
       </Dialog>
@@ -254,6 +259,8 @@ export function SamplesClient({
               editing={editing}
               onClose={() => setEditing(null)}
               onQuickCreateCustomer={onQuickCreateCustomer}
+              onQuickCreateSupplier={onQuickCreateSupplier}
+              onQuickCreateProduct={onQuickCreateProduct}
             />
           )}
         </DialogContent>

@@ -47,10 +47,11 @@ interface Props {
   canCreate: boolean;
   canApprove: boolean;
   onQuickCreateCustomer: (name: string) => Promise<EntityOption>;
+  onQuickCreateProduct: (name: string) => Promise<EntityOption>;
 }
 
 export function SalesOrdersClient({
-  orders, customers, products, canCreate, canApprove, onQuickCreateCustomer,
+  orders, customers, products, canCreate, canApprove, onQuickCreateCustomer, onQuickCreateProduct,
 }: Props) {
   const router = useRouter();
   const [query, setQuery] = React.useState('');
@@ -232,6 +233,7 @@ export function SalesOrdersClient({
             customers={customers}
             products={products}
             onQuickCreateCustomer={onQuickCreateCustomer}
+            onQuickCreateProduct={onQuickCreateProduct}
             onClose={() => setFormOpen(false)}
           />
         </DialogContent>
@@ -247,6 +249,7 @@ export function SalesOrdersClient({
               customers={customers}
               products={products}
               onQuickCreateCustomer={onQuickCreateCustomer}
+              onQuickCreateProduct={onQuickCreateProduct}
               onClose={() => setEditingOrder(null)}
               editing={{
                 id: editingOrder.id,

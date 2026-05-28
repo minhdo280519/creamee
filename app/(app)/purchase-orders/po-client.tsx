@@ -64,10 +64,12 @@ interface Props {
   defaultFxRate: number;
   canEdit: boolean;
   onQuickCreateSupplier: (name: string) => Promise<EntityOption>;
+  onQuickCreateProduct: (name: string) => Promise<EntityOption>;
 }
 
 export function POClient({
-  orders, suppliers, products, salesOrders, defaultFxRate, canEdit, onQuickCreateSupplier,
+  orders, suppliers, products, salesOrders, defaultFxRate, canEdit,
+  onQuickCreateSupplier, onQuickCreateProduct,
 }: Props) {
   const router = useRouter();
   const [query, setQuery] = React.useState('');
@@ -228,6 +230,7 @@ export function POClient({
             salesOrders={salesOrders}
             defaultFxRate={defaultFxRate}
             onQuickCreateSupplier={onQuickCreateSupplier}
+            onQuickCreateProduct={onQuickCreateProduct}
             onClose={() => setFormOpen(false)}
           />
         </DialogContent>
