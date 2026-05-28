@@ -17,6 +17,7 @@ import { DataTable } from '@/components/data-table';
 import { SchemaForm } from '@/components/schema-form';
 import type { EntityOption } from '@/components/entity-combobox';
 import { vnd } from '@/lib/utils';
+import { ProductHistoryDialog } from './product-history-dialog';
 
 interface Props {
   products: Product[];
@@ -33,6 +34,7 @@ export function ProductsClient({
   const [query, setQuery] = React.useState('');
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [editing, setEditing] = React.useState<Product | null>(null);
+  const [historyProductId, setHistoryProductId] = React.useState<string | null>(null);
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -97,6 +99,18 @@ export function ProductsClient({
         emptyMessage={query ? 'Không tìm thấy sản phẩm.' : 'Chưa có sản phẩm nào.'}
         extraColumns={[
           {
+            key: 'img',
+            label: 'Ảnh',
+            render: (r) => {
+              const url = r.image_url as string | null;
+              if (!url) return <span className="text-muted-foreground text-xs">—</span>;
+              return (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={url} alt="" className="h-9 w-9 rounded object-cover border" />
+              );
+            },
+          },
+          {
             key: 'stock_status',
             label: 'Trạng thái kho',
             render: (r) => {
@@ -108,6 +122,18 @@ export function ProductsClient({
                 return <Badge variant="warning">Sắp hết</Badge>;
               return <Badge variant="success">Còn hàng</Badge>;
             },
+          },
+          {
+            key: 'history_btn',
+            label: 'Lịch sử kho',
+            render: (r) => (
+              <button
+                className="text-xs text-primary hover:underline"
+                onClick={(e) => { e.stopPropagation(); setHistoryProductId(r.id as string); }}
+              >
+                Xem
+              </button>
+            ),
           },
           // Giá vốn tách đôi — chỉ hiện với role được xem.
           ...(canViewCost
@@ -140,6 +166,12 @@ export function ProductsClient({
               ]
             : []),
         ]}
+      />
+
+      <ProductHistoryDialog
+        productId={historyProductId}
+        open={historyProductId !== null}
+        onOpenChange={(o) => { if (!o) setHistoryProductId(null); }}
       />
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

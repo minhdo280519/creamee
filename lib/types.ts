@@ -9,7 +9,8 @@ import type { Role } from './roles';
 export type SampleStatus = 'pending' | 'approved' | 'cancelled';
 
 export type OrderStatus =
-  | 'draft' | 'pending_approval' | 'approved' | 'partial_paid' | 'paid'
+  | 'draft' | 'pending_approval' | 'approved' | 'processing'
+  | 'partial_paid' | 'paid'
   | 'partial_delivered' | 'delivered' | 'completed' | 'cancelled';
 
 export type PaymentStatus = 'unpaid' | 'partial' | 'paid' | 'overpaid';

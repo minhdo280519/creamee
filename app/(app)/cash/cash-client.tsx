@@ -49,12 +49,17 @@ const STATUS_VARIANT: Record<string, 'warning' | 'success' | 'destructive'> = {
   rejected: 'destructive',
 };
 
+interface SORef { id: string; code: string; customer_name: string }
+interface PORef { id: string; code: string; supplier_name: string }
+
 interface Props {
   transactions: CashTransaction[];
   canApprove: boolean;
+  salesOrders: SORef[];
+  purchaseOrders: PORef[];
 }
 
-export function CashClient({ transactions, canApprove }: Props) {
+export function CashClient({ transactions, canApprove, salesOrders, purchaseOrders }: Props) {
   const router = useRouter();
   const [query, setQuery] = React.useState('');
   const [dialogOpen, setDialogOpen] = React.useState(false);
@@ -67,6 +72,8 @@ export function CashClient({ transactions, canApprove }: Props) {
   const [date, setDate] = React.useState(new Date().toISOString().slice(0, 10));
   const [description, setDescription] = React.useState('');
   const [method, setMethod] = React.useState('cash');
+  const [refCode, setRefCode] = React.useState('');
+  const [refType, setRefType] = React.useState('');
 
   // Tổng thu/chi đã duyệt.
   const summary = React.useMemo(() => {
@@ -110,6 +117,8 @@ export function CashClient({ transactions, canApprove }: Props) {
         transaction_date: date,
         description,
         payment_method: method,
+        reference_type: refType || undefined,
+        reference_code: refCode || undefined,
       });
       if (!r.ok) {
         toast.error(r.error ?? 'Tạo thất bại');
@@ -120,6 +129,8 @@ export function CashClient({ transactions, canApprove }: Props) {
       setAmount(0);
       setCategory('');
       setDescription('');
+      setRefCode('');
+      setRefType('');
       router.refresh();
     } finally {
       setSaving(false);
@@ -355,6 +366,45 @@ export function CashClient({ transactions, canApprove }: Props) {
                 </Select>
               </div>
             </div>
+            {/* Gắn đơn hàng */}
+            {(category === 'sales_payment' || category === 'customer_deposit') && (
+              <div className="space-y-1.5">
+                <Label>Gắn với đơn bán hàng (SO)</Label>
+                <Select
+                  value={refCode}
+                  onValueChange={(v) => { setRefCode(v); setRefType(v ? 'sales_order' : ''); }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Chọn SO (tuỳ chọn)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">— Không gắn —</SelectItem>
+                    {salesOrders.map((s) => (
+                      <SelectItem key={s.id} value={s.code}>
+                        {s.code} · {s.customer_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {category === 'po_payment' && (
+              <div className="space-y-1.5">
+                <Label>Gắn với đơn nhập hàng (PO)</Label>
+                <Select
+                  value={refCode}
+                  onValueChange={(v) => { setRefCode(v); setRefType(v ? 'purchase_order' : ''); }}
+                >
+                  <SelectTrigger><SelectValue placeholder="Chọn PO (tuỳ chọn)" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">— Không gắn —</SelectItem>
+                    {purchaseOrders.map((p) => (
+                      <SelectItem key={p.id} value={p.code}>
+                        {p.code} · {p.supplier_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="description">Mô tả</Label>
               <Textarea

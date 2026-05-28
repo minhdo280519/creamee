@@ -86,26 +86,28 @@ export const canManagePurchasing = (r: Role): boolean =>
  * Trang nào role nào vào được — dùng để build sidebar động + middleware.
  * Key = path prefix, value = danh sách role được phép.
  */
+const KT = ['accountant_lead', 'accountant'] as const;
+
 export const ROUTE_ACCESS: Record<string, Role[]> = {
-  '/dashboard': [...STAFF_ROLES],
-  '/customers': ['owner', 'manager', 'sales', 'accountant_lead', 'accountant'],
-  '/products': [...STAFF_ROLES],
-  '/inventory-lots': ['owner', 'manager', 'warehouse', 'accountant_lead', 'accountant'],
-  '/suppliers': ['owner', 'manager', 'warehouse'],
-  '/quotations': ['owner', 'manager', 'sales'],
-  '/sales-orders': ['owner', 'manager', 'sales', 'accountant_lead', 'accountant'],
-  '/purchase-orders': ['owner', 'manager', 'warehouse'],
-  '/warehouse': ['owner', 'manager', 'warehouse'],
-  '/logistics': ['owner', 'manager', 'warehouse'],
-  '/samples': ['owner', 'manager', 'warehouse', 'sales'],
-  '/cash': ['owner', 'accountant_lead', 'accountant', 'manager'],
-  '/ar-ap': ['owner', 'manager', 'accountant_lead', 'accountant'],
-  '/deals': ['owner', 'manager', 'sales'],
-  '/activities': ['owner', 'manager', 'sales'],
-  '/analytics': ['owner', 'manager', 'accountant_lead'],
-  '/ai': [...STAFF_ROLES],
-  '/users': ['owner', 'hr'],
-  '/settings': ['owner'],
+  '/dashboard':      [...STAFF_ROLES],
+  '/customers':      ['owner', 'manager', 'sales', ...KT],
+  '/products':       [...STAFF_ROLES],
+  '/inventory-lots': ['owner', 'manager', 'warehouse', ...KT],
+  '/suppliers':      ['owner', 'manager', 'warehouse', ...KT],
+  '/quotations':     ['owner', 'manager', 'sales', ...KT],
+  '/sales-orders':   ['owner', 'manager', 'sales', ...KT],
+  '/purchase-orders':['owner', 'manager', 'warehouse', ...KT],
+  '/warehouse':      ['owner', 'manager', 'warehouse', ...KT],
+  '/logistics':      ['owner', 'manager', 'warehouse', ...KT],
+  '/samples':        ['owner', 'manager', 'warehouse', 'sales', ...KT],
+  '/cash':           ['owner', 'manager', ...KT],
+  '/ar-ap':          ['owner', 'manager', ...KT],
+  '/deals':          ['owner', 'manager', 'sales', ...KT],
+  '/activities':     ['owner', 'manager', 'sales', ...KT],
+  '/analytics':      ['owner', 'manager', ...KT],
+  '/ai':             [...STAFF_ROLES],
+  '/users':          ['owner', 'hr'],
+  '/settings':       ['owner'],
 };
 
 /** Kiểm tra role có vào được path không (so khớp prefix dài nhất). */

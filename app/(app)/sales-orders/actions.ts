@@ -267,6 +267,99 @@ export async function getSalesOrderItems(orderId: string): Promise<{
   };
 }
 
+// ── SO Detail ──────────────────────────────────────────────────────────────
+
+export interface SODetailItem {
+  id: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  discount_pct: number;
+  line_total: number;
+  delivered_qty: number;
+}
+
+export interface SODetailData {
+  id: string; code: string;
+  customer_name: string; customer_code: string; customer_id: string;
+  order_date: string; delivery_date: string | null; delivery_address: string | null; notes: string | null;
+  subtotal: number; discount_amount: number; shipping_fee: number;
+  total: number; paid_amount: number; deposit_amount: number;
+  status: string; payment_status: string;
+  created_by_name: string | null; approved_by_name: string | null;
+  items: SODetailItem[];
+  relatedPOs: { id: string; code: string; supplier_name: string | null; status: string; total_vnd: number; order_date: string }[];
+  cashPaid: number;
+}
+
+export async function getSODetail(orderId: string): Promise<{ ok: boolean; data?: SODetailData; error?: string }> {
+  await requireUser();
+  const { rows: oRows } = await query<{
+    id: string; code: string; customer_id: string; customer_name: string; customer_code: string;
+    order_date: string; delivery_date: string | null; delivery_address: string | null; notes: string | null;
+    subtotal: number; discount_amount: number; shipping_fee: number;
+    total: number; paid_amount: number; deposit_amount: number;
+    status: string; payment_status: string;
+    created_by_name: string | null; approved_by_name: string | null;
+  }>(
+    `SELECT so.*,
+            COALESCE(c.name,'—') AS customer_name, COALESCE(c.code,'') AS customer_code,
+            cb.full_name AS created_by_name, ab.full_name AS approved_by_name
+     FROM sales_orders so
+     LEFT JOIN customers c  ON so.customer_id = c.id
+     LEFT JOIN profiles  cb ON so.created_by = cb.id
+     LEFT JOIN profiles  ab ON so.approved_by = ab.id
+     WHERE so.id = ? LIMIT 1`,
+    [orderId],
+  );
+  if (!oRows[0]) return { ok: false, error: 'Không tìm thấy đơn' };
+  const o = oRows[0];
+
+  const { rows: items } = await query<{
+    id: string; product_name_snapshot: string; quantity: number;
+    unit_price: number; discount_pct: number; line_total: number; delivered_qty: number;
+  }>(`SELECT id, product_name_snapshot, quantity, unit_price, discount_pct, line_total, delivered_qty
+      FROM sales_order_items WHERE order_id = ? ORDER BY sort_order`, [orderId]);
+
+  const { rows: poRows } = await query<{
+    id: string; code: string; supplier_name: string | null; status: string; total_vnd: number; order_date: string;
+  }>(`SELECT po.id, po.code, s.name AS supplier_name, po.status, po.total_vnd, po.order_date
+      FROM purchase_orders po LEFT JOIN suppliers s ON po.supplier_id = s.id
+      WHERE po.so_id = ? OR po.so_code = ? ORDER BY po.order_date DESC`, [orderId, o.code]);
+
+  const { rows: cashRows } = await query<{ total_paid: number }>(
+    `SELECT COALESCE(SUM(amount_vnd),0) AS total_paid FROM cash_transactions
+     WHERE reference_type='sales_order' AND reference_code=? AND transaction_type='income' AND status='approved'`,
+    [o.code],
+  );
+
+  return {
+    ok: true,
+    data: {
+      id: o.id, code: o.code, customer_id: o.customer_id,
+      customer_name: o.customer_name, customer_code: o.customer_code,
+      order_date: o.order_date, delivery_date: o.delivery_date,
+      delivery_address: o.delivery_address, notes: o.notes,
+      subtotal: Number(o.subtotal), discount_amount: Number(o.discount_amount),
+      shipping_fee: Number(o.shipping_fee), total: Number(o.total),
+      paid_amount: Number(o.paid_amount), deposit_amount: Number(o.deposit_amount),
+      status: o.status, payment_status: o.payment_status,
+      created_by_name: o.created_by_name, approved_by_name: o.approved_by_name,
+      items: items.map((r) => ({
+        id: r.id, product_name: r.product_name_snapshot,
+        quantity: Number(r.quantity), unit_price: Number(r.unit_price),
+        discount_pct: Number(r.discount_pct), line_total: Number(r.line_total),
+        delivered_qty: Number(r.delivered_qty),
+      })),
+      relatedPOs: poRows.map((r) => ({
+        id: r.id, code: r.code, supplier_name: r.supplier_name,
+        status: r.status, total_vnd: Number(r.total_vnd), order_date: r.order_date,
+      })),
+      cashPaid: Number(cashRows[0]?.total_paid ?? 0),
+    },
+  };
+}
+
 /** Từ chối đơn bán. */
 export async function rejectSalesOrder(
   orderId: string,

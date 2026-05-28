@@ -19,6 +19,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import { POForm } from './po-form';
+import { PODetailDialog } from './po-detail-dialog';
 import type { EntityOption } from '@/components/entity-combobox';
 
 interface PORow {
@@ -74,6 +75,7 @@ export function POClient({
   const router = useRouter();
   const [query, setQuery] = React.useState('');
   const [formOpen, setFormOpen] = React.useState(false);
+  const [detailPoId, setDetailPoId] = React.useState<string | null>(null);
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -162,7 +164,11 @@ export function POClient({
                 const pay = PAY_STATUS[o.payment_status] ?? PAY_STATUS.unpaid!;
                 return (
                   <TableRow key={o.id}>
-                    <TableCell className="font-medium">{o.code}</TableCell>
+                    <TableCell className="font-medium">
+                      <button className="hover:underline text-primary" onClick={() => setDetailPoId(o.id)}>
+                        {o.code}
+                      </button>
+                    </TableCell>
                     <TableCell>{o.supplier?.name ?? '—'}</TableCell>
                     <TableCell className="text-muted-foreground text-xs">
                       {o.so_code ?? '—'}
@@ -218,6 +224,14 @@ export function POClient({
           </Table>
         </div>
       )}
+
+      <PODetailDialog
+        poId={detailPoId}
+        open={detailPoId !== null}
+        onOpenChange={(o) => { if (!o) setDetailPoId(null); }}
+        canEdit={canEdit}
+        salesOrders={salesOrders}
+      />
 
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">

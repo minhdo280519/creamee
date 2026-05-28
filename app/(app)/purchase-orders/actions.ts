@@ -93,6 +93,101 @@ export async function updatePOStatus(id: string, status: string): Promise<Action
   return { ok: true };
 }
 
+// ── PO Detail ──────────────────────────────────────────────────────────────
+
+export interface PODetailItem {
+  id: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  received_qty: number;
+  unit_cost_cny: number;
+  line_total_cny: number;
+  so_id: string | null;
+  so_code: string | null;
+}
+
+export interface PODetailData {
+  id: string; code: string;
+  supplier_id: string; supplier_name: string; supplier_code: string;
+  so_id: string | null; so_code: string | null;
+  order_date: string; expected_arrival_date: string | null;
+  fx_rate: number; subtotal_cny: number; shipping_cny: number;
+  total_cny: number; total_vnd: number; paid_cny: number;
+  status: string; payment_status: string; notes: string | null;
+  created_by_name: string | null;
+  items: PODetailItem[];
+}
+
+export async function getPODetail(poId: string): Promise<{ ok: boolean; data?: PODetailData; error?: string }> {
+  await requireUser();
+  const { rows: oRows } = await query<{
+    id: string; code: string; supplier_id: string; supplier_name: string; supplier_code: string;
+    so_id: string | null; so_code: string | null;
+    order_date: string; expected_arrival_date: string | null;
+    fx_rate: number; subtotal_cny: number; shipping_cny: number;
+    total_cny: number; total_vnd: number; paid_cny: number;
+    status: string; payment_status: string; notes: string | null;
+    created_by_name: string | null;
+  }>(
+    `SELECT po.*,
+            COALESCE(s.name,'—') AS supplier_name, COALESCE(s.code,'') AS supplier_code,
+            cb.full_name AS created_by_name
+     FROM purchase_orders po
+     LEFT JOIN suppliers s ON po.supplier_id = s.id
+     LEFT JOIN profiles  cb ON po.created_by = cb.id
+     WHERE po.id = ? LIMIT 1`,
+    [poId],
+  );
+  if (!oRows[0]) return { ok: false, error: 'Không tìm thấy PO' };
+  const o = oRows[0];
+
+  const { rows: items } = await query<{
+    id: string; product_id: string; product_name_snapshot: string;
+    quantity: number; received_qty: number; unit_cost_cny: number; line_total_cny: number;
+    so_id: string | null; so_code: string | null;
+  }>(`SELECT id, product_id, product_name_snapshot, quantity, received_qty,
+             unit_cost_cny, line_total_cny, so_id, so_code
+      FROM purchase_order_items WHERE po_id = ? ORDER BY sort_order`, [poId]);
+
+  return {
+    ok: true,
+    data: {
+      id: o.id, code: o.code, supplier_id: o.supplier_id,
+      supplier_name: o.supplier_name, supplier_code: o.supplier_code,
+      so_id: o.so_id, so_code: o.so_code,
+      order_date: o.order_date, expected_arrival_date: o.expected_arrival_date,
+      fx_rate: Number(o.fx_rate),
+      subtotal_cny: Number(o.subtotal_cny), shipping_cny: Number(o.shipping_cny),
+      total_cny: Number(o.total_cny), total_vnd: Number(o.total_vnd),
+      paid_cny: Number(o.paid_cny),
+      status: o.status, payment_status: o.payment_status, notes: o.notes,
+      created_by_name: o.created_by_name,
+      items: items.map((r) => ({
+        id: r.id, product_id: r.product_id, product_name: r.product_name_snapshot,
+        quantity: Number(r.quantity), received_qty: Number(r.received_qty),
+        unit_cost_cny: Number(r.unit_cost_cny), line_total_cny: Number(r.line_total_cny),
+        so_id: r.so_id, so_code: r.so_code,
+      })),
+    },
+  };
+}
+
+/** Gắn/bỏ SO cho từng dòng hàng trong PO. */
+export async function updatePOItemSOLink(
+  itemId: string,
+  soId: string | null,
+  soCode: string | null,
+): Promise<ActionResult> {
+  await requireUser();
+  await query(
+    'UPDATE purchase_order_items SET so_id = ?, so_code = ? WHERE id = ?',
+    [soId || null, soCode || null, itemId],
+  );
+  revalidatePath('/purchase-orders');
+  return { ok: true };
+}
+
 /**
  * Ghi nhận thanh toán tiền hàng cho NCC — cộng vào paid_cny.
  */

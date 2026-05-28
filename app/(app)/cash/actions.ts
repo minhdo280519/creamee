@@ -16,6 +16,63 @@ export interface CashDraft {
   customer_id?: string;
   supplier_id?: string;
   payment_method: string;
+  reference_type?: string;
+  reference_code?: string;
+}
+
+/** Đồng bộ paid_amount và payment_status của SO từ các phiếu thu đã duyệt. */
+async function syncSOPayment(soCode: string) {
+  const { rows } = await query<{ total_paid: number; total: number }>(
+    `SELECT so.total,
+            COALESCE((SELECT SUM(ct.amount_vnd) FROM cash_transactions ct
+                      WHERE ct.reference_type = 'sales_order'
+                        AND ct.reference_code = so.code
+                        AND ct.transaction_type = 'income'
+                        AND ct.status = 'approved'), 0) AS total_paid
+     FROM sales_orders so WHERE so.code = ? LIMIT 1`,
+    [soCode],
+  );
+  if (!rows[0]) return;
+  const total = Number(rows[0].total);
+  const paid = Number(rows[0].total_paid);
+  let payStatus: string;
+  if (paid <= 0) payStatus = 'unpaid';
+  else if (paid >= total) payStatus = 'paid';
+  else payStatus = 'partial';
+
+  await query(
+    `UPDATE sales_orders SET paid_amount = ?, payment_status = ? WHERE code = ?`,
+    [paid, payStatus, soCode],
+  );
+  revalidatePath('/sales-orders');
+}
+
+/** Đồng bộ paid_cny và payment_status của PO từ các phiếu chi đã duyệt. */
+async function syncPOPayment(poCode: string) {
+  const { rows } = await query<{ total_cny: number; fx_rate: number; total_paid_vnd: number }>(
+    `SELECT po.total_cny, po.fx_rate,
+            COALESCE((SELECT SUM(ct.amount_vnd) FROM cash_transactions ct
+                      WHERE ct.reference_type = 'purchase_order'
+                        AND ct.reference_code = po.code
+                        AND ct.transaction_type = 'expense'
+                        AND ct.status = 'approved'), 0) AS total_paid_vnd
+     FROM purchase_orders po WHERE po.code = ? LIMIT 1`,
+    [poCode],
+  );
+  if (!rows[0]) return;
+  const totalCny = Number(rows[0].total_cny);
+  const fxRate = Number(rows[0].fx_rate) || 1;
+  const paidCny = Number(rows[0].total_paid_vnd) / fxRate;
+  let payStatus: string;
+  if (paidCny <= 0) payStatus = 'unpaid';
+  else if (paidCny >= totalCny) payStatus = 'paid';
+  else payStatus = 'partial';
+
+  await query(
+    `UPDATE purchase_orders SET paid_cny = ?, payment_status = ? WHERE code = ?`,
+    [paidCny, payStatus, poCode],
+  );
+  revalidatePath('/purchase-orders');
 }
 
 /**
@@ -37,21 +94,32 @@ export async function createCashTransaction(
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
 
+  const refType = draft.reference_type || null;
+  const refCode = draft.reference_code?.trim() || null;
+
   await query(
     `INSERT INTO cash_transactions
      (id, code, transaction_type, amount_vnd, category, transaction_date,
       description, customer_id, supplier_id, payment_method, status,
+      reference_type, reference_code,
       created_by, approved_by, approved_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id, code, draft.transaction_type, draft.amount_vnd, draft.category,
       draft.transaction_date, draft.description || null,
       draft.customer_id || null, draft.supplier_id || null,
-      draft.payment_method || 'cash', status, profile.id,
+      draft.payment_method || 'cash', status,
+      refType, refCode,
+      profile.id,
       selfApprove ? profile.id : null,
       selfApprove ? now : null,
     ],
   );
+
+  if (selfApprove && refCode) {
+    if (refType === 'sales_order') await syncSOPayment(refCode);
+    if (refType === 'purchase_order') await syncPOPayment(refCode);
+  }
 
   if (!selfApprove) {
     await query(
@@ -73,6 +141,11 @@ export async function approveCashTransaction(id: string): Promise<ActionResult> 
     return { ok: false, error: 'Bạn không có quyền duyệt giao dịch tiền' };
   }
 
+  const { rows: ctRows } = await query<{ reference_type: string | null; reference_code: string | null }>(
+    'SELECT reference_type, reference_code FROM cash_transactions WHERE id = ? LIMIT 1',
+    [id],
+  );
+
   const now = new Date().toISOString();
   await query(
     `UPDATE cash_transactions
@@ -86,6 +159,12 @@ export async function approveCashTransaction(id: string): Promise<ActionResult> 
      WHERE entity_type = 'cash_transaction' AND entity_id = ? AND status = 'pending'`,
     [profile.id, now, id],
   );
+
+  const ct = ctRows[0];
+  if (ct?.reference_code) {
+    if (ct.reference_type === 'sales_order') await syncSOPayment(ct.reference_code);
+    if (ct.reference_type === 'purchase_order') await syncPOPayment(ct.reference_code);
+  }
 
   revalidatePath('/cash');
   return { ok: true };

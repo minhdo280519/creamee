@@ -13,6 +13,7 @@ import type { SalesOrderWithCustomer } from '@/lib/types';
 import { approveSalesOrder, rejectSalesOrder, getSalesOrderItems } from './actions';
 import { SalesOrderForm } from './sales-order-form';
 import { DeliveryDialog } from './delivery-dialog';
+import { SODetailDialog } from './so-detail-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -62,6 +63,8 @@ export function SalesOrdersClient({
   // Đơn đang mở dialog giao hàng.
   const [deliverOrderId, setDeliverOrderId] = React.useState<string | null>(null);
   const [deliverOrderCode, setDeliverOrderCode] = React.useState('');
+  // Chi tiết đơn
+  const [detailOrderId, setDetailOrderId] = React.useState<string | null>(null);
 
   const filtered = React.useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -148,7 +151,14 @@ export function SalesOrdersClient({
             <TableBody>
               {filtered.map((o) => (
                 <TableRow key={o.id}>
-                  <TableCell className="font-medium">{o.code}</TableCell>
+                  <TableCell className="font-medium">
+                    <button
+                      className="hover:underline text-primary"
+                      onClick={() => setDetailOrderId(o.id)}
+                    >
+                      {o.code}
+                    </button>
+                  </TableCell>
                   <TableCell>{o.customer?.name ?? '—'}</TableCell>
                   <TableCell>{formatDate(o.order_date)}</TableCell>
                   <TableCell className="text-right font-medium">
@@ -275,6 +285,13 @@ export function SalesOrdersClient({
         onOpenChange={(o) => {
           if (!o) setDeliverOrderId(null);
         }}
+      />
+
+      <SODetailDialog
+        orderId={detailOrderId}
+        open={detailOrderId !== null}
+        onOpenChange={(o) => { if (!o) setDetailOrderId(null); }}
+        canApprove={canApprove}
       />
     </div>
   );

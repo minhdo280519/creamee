@@ -106,6 +106,116 @@ export async function quickCreateProduct(name: string): Promise<{ id: string; la
   return { id, label: trimmed };
 }
 
+export interface ProductMovement {
+  date: string;
+  type: 'in' | 'out';
+  qty: number;
+  lot_code: string | null;
+  ref_code: string | null;
+  ref_type: 'PO' | 'SO';
+  note: string;
+}
+
+/** Lịch sử nhập/xuất của một sản phẩm — từ inventory_lots và delivery_lot_lines. */
+export async function getProductHistory(productId: string): Promise<{
+  ok: boolean;
+  productName?: string;
+  movements?: ProductMovement[];
+  error?: string;
+}> {
+  await requireUser();
+
+  const { rows: pRows } = await query<{ name: string }>(
+    'SELECT name FROM products WHERE id = ? LIMIT 1',
+    [productId],
+  );
+  if (!pRows[0]) return { ok: false, error: 'Không tìm thấy sản phẩm' };
+
+  // Nhập kho: inventory_lots
+  const { rows: inRows } = await query<{
+    lot_code: string; qty_total: number; created_at: string;
+    po_code: string | null;
+  }>(
+    `SELECT il.lot_code, il.qty_total, il.created_at,
+            po.code AS po_code
+     FROM inventory_lots il
+     LEFT JOIN purchase_order_items poi ON il.po_item_id = poi.id
+     LEFT JOIN purchase_orders po ON poi.po_id = po.id
+     WHERE il.product_id = ?
+     ORDER BY il.created_at ASC`,
+    [productId],
+  );
+
+  // Xuất kho: delivery_lot_lines
+  const { rows: outRows } = await query<{
+    created_at: string; qty: number; lot_id: string;
+    so_code: string | null; lot_code: string | null;
+  }>(
+    `SELECT dll.created_at, dll.qty, dll.lot_id,
+            so.code AS so_code, il.lot_code
+     FROM delivery_lot_lines dll
+     LEFT JOIN sales_orders so  ON dll.order_id = so.id
+     LEFT JOIN inventory_lots il ON dll.lot_id = il.id
+     WHERE dll.product_id = ?
+     ORDER BY dll.created_at ASC`,
+    [productId],
+  );
+
+  // Xuất qua markDelivered (sales_order_items.delivered_qty, no lot line)
+  const { rows: soDelivered } = await query<{
+    delivered_qty: number; product_name_snapshot: string;
+    so_code: string; updated_at: string;
+  }>(
+    `SELECT soi.delivered_qty, soi.product_name_snapshot,
+            so.code AS so_code, so.updated_at
+     FROM sales_order_items soi
+     JOIN sales_orders so ON soi.order_id = so.id
+     WHERE soi.product_id = ? AND soi.delivered_qty > 0
+     ORDER BY so.updated_at ASC`,
+    [productId],
+  );
+
+  const movements: ProductMovement[] = [
+    ...inRows.map((r) => ({
+      date: r.created_at,
+      type: 'in' as const,
+      qty: Number(r.qty_total),
+      lot_code: r.lot_code,
+      ref_code: r.po_code,
+      ref_type: 'PO' as const,
+      note: r.po_code ? `Nhập từ ${r.po_code}` : 'Nhập kho',
+    })),
+    ...outRows.map((r) => ({
+      date: r.created_at,
+      type: 'out' as const,
+      qty: Number(r.qty),
+      lot_code: r.lot_code,
+      ref_code: r.so_code,
+      ref_type: 'SO' as const,
+      note: r.so_code ? `Xuất cho ${r.so_code}` : 'Xuất kho',
+    })),
+  ];
+
+  // Nếu không có delivery_lot_lines, dùng sales_order_items.delivered_qty
+  if (outRows.length === 0 && soDelivered.length > 0) {
+    for (const r of soDelivered) {
+      movements.push({
+        date: r.updated_at,
+        type: 'out',
+        qty: Number(r.delivered_qty),
+        lot_code: null,
+        ref_code: r.so_code,
+        ref_type: 'SO',
+        note: `Xuất cho ${r.so_code}`,
+      });
+    }
+  }
+
+  movements.sort((a, b) => a.date.localeCompare(b.date));
+
+  return { ok: true, productName: pRows[0].name, movements };
+}
+
 /**
  * Tạo nhanh nhà cung cấp chỉ với tên — cho EntityCombobox auto-add.
  */
