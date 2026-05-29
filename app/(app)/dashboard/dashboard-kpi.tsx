@@ -41,7 +41,6 @@ export interface LowStockProduct {
   sku: string;
   current_stock: number;
   reorder_point: number;
-  unit: string;
 }
 
 export interface ArRow {
@@ -334,14 +333,14 @@ export function DashboardKpi({ kpi, todayOrders, pendingOrders, lowStockProducts
                       <TableCell className="font-mono text-xs text-muted-foreground">{p.sku}</TableCell>
                       <TableCell className="text-right tabular-nums">
                         <span className={p.current_stock <= 0 ? 'text-destructive font-semibold' : 'text-amber-600 font-medium'}>
-                          {p.current_stock} {p.unit}
+                          {p.current_stock}
                         </span>
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {p.reorder_point} {p.unit}
+                        {p.reorder_point}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-orange-600 font-medium">
-                        +{Math.max(0, p.reorder_point - p.current_stock)} {p.unit}
+                        +{Math.max(0, p.reorder_point - p.current_stock)}
                       </TableCell>
                     </TableRow>
                   ))}

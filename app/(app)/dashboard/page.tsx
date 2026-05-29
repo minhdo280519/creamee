@@ -119,8 +119,7 @@ export default async function DashboardPage() {
     ),
     // Low stock detail
     query<LowStockProduct>(
-      `SELECT id, name, sku, current_stock, reorder_point,
-              COALESCE(unit, 'cái') AS unit
+      `SELECT id, name, sku, current_stock, reorder_point
        FROM products
        WHERE current_stock <= reorder_point AND is_active = 1
        ORDER BY current_stock ASC`,
