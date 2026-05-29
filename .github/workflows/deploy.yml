@@ -78,7 +78,7 @@ jobs:
           echo "→ Chạy DB migrations..."
           bash migrations/run.sh
           echo "→ Cài dependencies..."
-          npm ci --omit=dev
+          npm install --omit=dev --prefer-offline
           echo "→ Restart app..."
           pm2 describe creamee > /dev/null 2>&1 \
             && pm2 restart creamee --update-env \
