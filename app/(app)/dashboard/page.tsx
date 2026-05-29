@@ -1,6 +1,5 @@
 import {
-  ShoppingCart, Banknote, ClipboardCheck, PackageX, Scale, AlertTriangle,
-  TrendingUp, TrendingDown, Users, Truck,
+  TrendingUp, TrendingDown, Truck, AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { requireUser } from '@/lib/auth';
@@ -8,10 +7,12 @@ import { query } from '@/lib/db';
 import { vnd, num, formatDate } from '@/lib/utils';
 import { ROLE_LABELS, isFinance, isManagement, type Role } from '@/lib/roles';
 import { PageHeader } from '@/components/page-header';
-import { StatCard } from '@/components/stat-card';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import type { DashboardMetrics } from '@/lib/types';
+import { DashboardKpi } from './dashboard-kpi';
+import type {
+  TodayOrder, PendingOrder, LowStockProduct, ArRow,
+} from './dashboard-kpi';
 
 export const metadata = { title: 'Bảng điều khiển — CREAMEE ERP' };
 
@@ -20,7 +21,7 @@ export default async function DashboardPage() {
   const role = profile.role as Role;
 
   const today = new Date().toISOString().slice(0, 10);
-  const thisMonth = today.slice(0, 7);   // YYYY-MM
+  const thisMonth = today.slice(0, 7);
   const lastMonth = (() => {
     const d = new Date(today);
     d.setDate(1);
@@ -29,7 +30,6 @@ export default async function DashboardPage() {
   })();
 
   const [
-    { rows: ordersToday },
     { rows: revenueToday },
     { rows: pending },
     { rows: lowStock },
@@ -40,11 +40,12 @@ export default async function DashboardPage() {
     { rows: leadCounts },
     { rows: pendingCash },
     { rows: poArriving },
+    // Detail data for drill-down
+    { rows: todayOrdersDetail },
+    { rows: pendingOrdersDetail },
+    { rows: lowStockDetail },
+    { rows: arDetail },
   ] = await Promise.all([
-    query<{ cnt: number }>(
-      "SELECT COUNT(*) AS cnt FROM sales_orders WHERE DATE(order_date) = ? AND status != 'cancelled'",
-      [today],
-    ),
     query<{ total: number }>(
       "SELECT COALESCE(SUM(total), 0) AS total FROM sales_orders WHERE DATE(order_date) = ? AND status != 'cancelled'",
       [today],
@@ -62,21 +63,18 @@ export default async function DashboardPage() {
        FROM sales_orders
        WHERE payment_status != 'paid' AND status NOT IN ('cancelled','draft')`,
     ),
-    // Doanh thu tháng này
     query<{ total: number }>(
       `SELECT COALESCE(SUM(total), 0) AS total
        FROM sales_orders
        WHERE DATE_FORMAT(order_date, '%Y-%m') = ? AND status NOT IN ('cancelled','draft')`,
       [thisMonth],
     ),
-    // Doanh thu tháng trước
     query<{ total: number }>(
       `SELECT COALESCE(SUM(total), 0) AS total
        FROM sales_orders
        WHERE DATE_FORMAT(order_date, '%Y-%m') = ? AND status NOT IN ('cancelled','draft')`,
       [lastMonth],
     ),
-    // 5 đơn SO gần nhất
     query<{ id: string; code: string; customer_name: string | null; total: number; status: string; order_date: string }>(
       `SELECT so.id, so.code,
               COALESCE(c.name, so.customer_name_snapshot, '—') AS customer_name,
@@ -86,31 +84,60 @@ export default async function DashboardPage() {
        WHERE so.status NOT IN ('cancelled','draft')
        ORDER BY so.created_at DESC LIMIT 5`,
     ),
-    // Leads pipeline counts (nếu có bảng leads)
     query<{ status: string; cnt: number }>(
       `SELECT status, COUNT(*) AS cnt FROM leads GROUP BY status`,
     ).catch(() => ({ rows: [] })),
-    // Phiếu thu chi chờ duyệt
     query<{ cnt: number }>(
       "SELECT COUNT(*) AS cnt FROM cash_transactions WHERE status = 'pending'",
     ).catch(() => ({ rows: [{ cnt: 0 }] })),
-    // PO sắp về trong 7 ngày
     query<{ cnt: number }>(
       `SELECT COUNT(*) AS cnt FROM purchase_orders
        WHERE status NOT IN ('received','cancelled')
          AND expected_arrival_date BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 7 DAY)`,
     ).catch(() => ({ rows: [{ cnt: 0 }] })),
-  ]);
 
-  const metrics: DashboardMetrics = {
-    orders_today: ordersToday[0]?.cnt ?? 0,
-    revenue_today: revenueToday[0]?.total ?? 0,
-    pending_approvals: pending[0]?.cnt ?? 0,
-    low_stock_count: lowStock[0]?.cnt ?? 0,
-    overdue_ar_count: arRows[0]?.overdue ?? 0,
-    total_ar: arRows[0]?.outstanding ?? 0,
-    total_ap_cny: 0,
-  };
+    // Today's orders detail
+    query<TodayOrder>(
+      `SELECT so.id, so.code,
+              COALESCE(c.name, so.customer_name_snapshot, '—') AS customer_name,
+              so.total, so.status, so.order_date
+       FROM sales_orders so
+       LEFT JOIN customers c ON so.customer_id = c.id
+       WHERE DATE(so.order_date) = ? AND so.status != 'cancelled'
+       ORDER BY so.created_at DESC`,
+      [today],
+    ),
+    // Pending approval detail
+    query<PendingOrder>(
+      `SELECT so.id, so.code,
+              COALESCE(c.name, so.customer_name_snapshot, '—') AS customer_name,
+              so.total, so.order_date
+       FROM sales_orders so
+       LEFT JOIN customers c ON so.customer_id = c.id
+       WHERE so.status = 'pending_approval'
+       ORDER BY so.created_at ASC`,
+    ),
+    // Low stock detail
+    query<LowStockProduct>(
+      `SELECT id, name, sku, current_stock, reorder_point,
+              COALESCE(unit, 'cái') AS unit
+       FROM products
+       WHERE current_stock <= reorder_point AND is_active = 1
+       ORDER BY current_stock ASC`,
+    ),
+    // AR breakdown
+    query<ArRow>(
+      `SELECT so.code,
+              COALESCE(c.name, so.customer_name_snapshot, '—') AS customer_name,
+              so.total, so.paid_amount,
+              (so.total - so.paid_amount) AS remaining,
+              so.order_date, so.payment_status
+       FROM sales_orders so
+       LEFT JOIN customers c ON so.customer_id = c.id
+       WHERE so.payment_status != 'paid' AND so.status NOT IN ('cancelled','draft')
+       ORDER BY remaining DESC`,
+    ),
+  ]);
 
   const thisMonthRevenue = revenueThisMonth[0]?.total ?? 0;
   const lastMonthRevenue = revenueLastMonth[0]?.total ?? 0;
@@ -143,33 +170,23 @@ export default async function DashboardPage() {
         description={`Tổng quan hoạt động — vai trò ${ROLE_LABELS[role]}`}
       />
 
-      {/* KPI Row */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Đơn hôm nay" value={num(metrics.orders_today)} icon={ShoppingCart} />
-        {showFinance && (
-          <StatCard
-            label="Doanh thu hôm nay"
-            value={vnd(metrics.revenue_today)}
-            icon={Banknote}
-            tone="success"
-          />
-        )}
-        {showManagement && (
-          <StatCard
-            label="Chờ duyệt"
-            value={num(metrics.pending_approvals)}
-            icon={ClipboardCheck}
-            tone={metrics.pending_approvals > 0 ? 'warning' : 'default'}
-            hint={metrics.pending_approvals > 0 ? 'Cần xử lý' : 'Không có'}
-          />
-        )}
-        <StatCard
-          label="Sản phẩm sắp hết"
-          value={num(metrics.low_stock_count)}
-          icon={PackageX}
-          tone={metrics.low_stock_count > 0 ? 'warning' : 'default'}
-        />
-      </div>
+      {/* Clickable KPI cards with drill-down dialogs */}
+      <DashboardKpi
+        kpi={{
+          orders_today: todayOrdersDetail.length,
+          revenue_today: revenueToday[0]?.total ?? 0,
+          pending_approvals: pending[0]?.cnt ?? 0,
+          low_stock_count: lowStock[0]?.cnt ?? 0,
+          total_ar: arRows[0]?.outstanding ?? 0,
+          overdue_ar_count: arRows[0]?.overdue ?? 0,
+          showFinance,
+          showManagement,
+        }}
+        todayOrders={todayOrdersDetail}
+        pendingOrders={pendingOrdersDetail}
+        lowStockProducts={lowStockDetail}
+        arRows={arDetail}
+      />
 
       {/* Second row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -194,26 +211,6 @@ export default async function DashboardPage() {
               <div className="text-xs text-muted-foreground mt-0.5">
                 Tháng trước: {vnd(lastMonthRevenue)}
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* AR + overdue */}
-        {showFinance && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Công nợ phải thu
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{vnd(metrics.total_ar)}</div>
-              {metrics.overdue_ar_count > 0 && (
-                <div className="flex items-center gap-1 mt-1 text-sm text-red-600">
-                  <AlertTriangle className="h-4 w-4" />
-                  {metrics.overdue_ar_count} đơn quá hạn 30 ngày
-                </div>
-              )}
             </CardContent>
           </Card>
         )}
@@ -243,7 +240,7 @@ export default async function DashboardPage() {
           </Card>
         )}
 
-        {/* PO + pending cash alerts */}
+        {/* Cần xử lý */}
         {showManagement && (
           <Card>
             <CardHeader className="pb-2">
@@ -267,15 +264,15 @@ export default async function DashboardPage() {
                   <Badge variant="default">{poArriving[0]?.cnt}</Badge>
                 </Link>
               )}
-              {metrics.pending_approvals > 0 && (
+              {(pending[0]?.cnt ?? 0) > 0 && (
                 <Link href="/sales-orders" className="flex items-center justify-between text-sm hover:text-primary">
                   <span>Đơn bán chờ duyệt</span>
-                  <Badge variant="warning">{metrics.pending_approvals}</Badge>
+                  <Badge variant="warning">{pending[0]?.cnt}</Badge>
                 </Link>
               )}
               {(pendingCash[0]?.cnt ?? 0) === 0 &&
                (poArriving[0]?.cnt ?? 0) === 0 &&
-               metrics.pending_approvals === 0 && (
+               (pending[0]?.cnt ?? 0) === 0 && (
                 <p className="text-sm text-muted-foreground">Không có gì cần xử lý.</p>
               )}
             </CardContent>
