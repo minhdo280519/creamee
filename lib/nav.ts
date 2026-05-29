@@ -73,7 +73,16 @@ export const NAV_TREE: NavSection[] = [
     items: [
       { href: '/cash', label: 'Thu chi tiền mặt' },
       { href: '/ar-ap', label: 'Công nợ' },
+      { href: '/overhead', label: 'Chi phí & Quỹ' },
       { href: '/analytics', label: 'Báo cáo & Phân tích' },
+    ],
+  },
+  {
+    key: 'hr',
+    label: 'Nhân sự',
+    icon: 'Users',
+    items: [
+      { href: '/hr', label: 'Nhân viên & Lương' },
     ],
   },
   {

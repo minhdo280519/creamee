@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, ShoppingCart, Truck, Package, Wallet, Settings,
   Users, Store, TrendingUp, BoxIcon, BarChart3, DollarSign, UserPlus,
+  PiggyBank,
   ChevronDown, ChevronRight, PanelLeftClose, PanelLeftOpen,
   type LucideIcon,
 } from 'lucide-react';
@@ -29,7 +30,9 @@ const ITEM_ICONS: Record<string, LucideIcon> = {
   '/inventory-lots': BoxIcon,
   '/cash': DollarSign,
   '/ar-ap': BarChart3,
+  '/overhead': PiggyBank,
   '/analytics': BarChart3,
+  '/hr': Users,
   '/ai': Settings,
   '/users': Users,
   '/settings': Settings,

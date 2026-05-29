@@ -312,6 +312,112 @@ export interface OrderPnL {
   gross_margin_pct: number | null;
 }
 
+// ── HR & Payroll ─────────────────────────────────────────────
+
+export interface Employee {
+  id: string;
+  code: string;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  position: string | null;
+  department: string | null;
+  base_salary_vnd: number;
+  bank_name: string | null;
+  bank_account: string | null;
+  profile_id: string | null;
+  hire_date: string | null;
+  terminate_date: string | null;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PayrollStatus = 'draft' | 'approved' | 'paid';
+
+export interface PayrollEntry {
+  id: string;
+  employee_id: string;
+  year: number;
+  month: number;
+  base_salary_vnd: number;
+  allowance_vnd: number;
+  bonus_vnd: number;
+  deduction_vnd: number;
+  net_salary_vnd: number;
+  kpi_orders_handled: number;
+  kpi_defect_rate_pct: number;
+  kpi_notes: string | null;
+  status: PayrollStatus;
+  paid_at: string | null;
+  approved_by: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PayrollEntryWithEmployee extends PayrollEntry {
+  employee_name: string;
+  employee_code: string;
+  position: string | null;
+}
+
+// ── Overhead & Cost Allocation ───────────────────────────────
+
+export interface OverheadCost {
+  id: string;
+  year: number;
+  month: number;
+  category: string;
+  amount_vnd: number;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface OrderCostAllocation {
+  id: string;
+  sales_order_id: string;
+  direct_cogs_vnd: number;
+  ship_cost_vnd: number;
+  overhead_allocated_vnd: number;
+  revenue_vnd: number;
+  gross_profit_vnd: number;
+  net_profit_vnd: number;
+  overhead_year: number | null;
+  overhead_month: number | null;
+  calculated_at: string;
+  updated_at: string;
+}
+
+// ── Funds ─────────────────────────────────────────────────────
+
+export type FundType = 'reserve' | 'profit_withdrawal' | 'operating';
+
+export interface Fund {
+  id: string;
+  fund_type: FundType;
+  balance_vnd: number;
+  last_updated: string;
+  notes: string | null;
+}
+
+export interface FundTransaction {
+  id: string;
+  fund_type: FundType;
+  transaction_type: 'deposit' | 'withdrawal' | 'transfer';
+  amount_vnd: number;
+  from_fund: FundType | null;
+  to_fund: FundType | null;
+  reason: string | null;
+  reference_type: string | null;
+  reference_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
 // ── Defect Management & QC ───────────────────────────────────
 
 export type DefectHandlingMethod =
