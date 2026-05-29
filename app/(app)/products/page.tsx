@@ -11,8 +11,16 @@ export default async function ProductsPage() {
   const profile = await requireAccess('/products');
 
   const [{ rows: products }, { rows: supplierRows }] = await Promise.all([
-    query<Product>(
-      'SELECT * FROM products WHERE is_active = 1 ORDER BY name LIMIT 500',
+    query<Product & { variants_count: number; first_variant_image: string | null }>(
+      `SELECT p.*,
+              COUNT(pv.id)          AS variants_count,
+              MIN(JSON_UNQUOTE(JSON_EXTRACT(pv.image_urls, '$[0]'))) AS first_variant_image
+       FROM products p
+       LEFT JOIN product_variants pv ON pv.product_id = p.id AND pv.is_active = 1
+       WHERE p.is_active = 1
+       GROUP BY p.id
+       ORDER BY p.name
+       LIMIT 500`,
     ),
     query<Pick<Supplier, 'id' | 'name'>>(
       'SELECT id, name FROM suppliers WHERE is_active = 1 ORDER BY name',
@@ -30,7 +38,7 @@ export default async function ProductsPage() {
         description={`${products.length} sản phẩm đang kinh doanh`}
       />
       <ProductsClient
-        products={products}
+        products={products as unknown as (Product & { variants_count: number; first_variant_image: string | null })[]}
         suppliers={suppliers}
         canEdit={canEdit}
         canViewCost={canViewCost(role)}

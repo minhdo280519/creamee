@@ -312,6 +312,32 @@ export interface OrderPnL {
   gross_margin_pct: number | null;
 }
 
+// ── Product Variants ─────────────────────────────────────────
+
+export interface ProductVariant {
+  id: string;
+  product_id: string;
+  sku: string;
+  color: string | null;
+  size: string | null;
+  barcode: string | null;
+  cost_cny: number;
+  cost_vnd: number;
+  price_vnd: number;
+  current_stock: number;
+  /** JSON array tối đa 10 URL ảnh lưu trên server. */
+  image_urls: string[] | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductVariantWithProduct extends ProductVariant {
+  product_name: string;
+  product_sku: string;
+}
+
 export interface Sample {
   id: string;
   code: string;

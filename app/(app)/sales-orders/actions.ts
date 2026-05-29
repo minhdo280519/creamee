@@ -14,6 +14,7 @@ import type { ActionResult } from '@/app/(app)/customers/actions';
 export interface SOLineDraft {
   product_id: string;
   product_name: string;
+  variant_id?: string | null;
   quantity: number;
   unit_price: number;
   discount_pct: number;
@@ -133,10 +134,10 @@ export async function createSalesOrder(
     const lineTotal = it.quantity * it.unit_price * (1 - it.discount_pct / 100);
     await query(
       `INSERT INTO sales_order_items
-       (id, order_id, product_id, product_name_snapshot, quantity,
+       (id, order_id, product_id, variant_id, product_name_snapshot, quantity,
         unit_price, discount_pct, line_total, sort_order)
-       VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, it.product_id, it.product_name, it.quantity,
+       VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, it.product_id, it.variant_id ?? null, it.product_name, it.quantity,
        it.unit_price, it.discount_pct, Math.round(lineTotal), idx],
     );
   }
@@ -436,10 +437,10 @@ export async function updateSalesOrder(
     const lineTotal = it.quantity * it.unit_price * (1 - it.discount_pct / 100);
     await query(
       `INSERT INTO sales_order_items
-       (id, order_id, product_id, product_name_snapshot, quantity,
+       (id, order_id, product_id, variant_id, product_name_snapshot, quantity,
         unit_price, discount_pct, line_total, sort_order)
-       VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [draft.order_id, it.product_id, it.product_name, it.quantity,
+       VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [draft.order_id, it.product_id, it.variant_id ?? null, it.product_name, it.quantity,
        it.unit_price, it.discount_pct, Math.round(lineTotal), idx],
     );
   }

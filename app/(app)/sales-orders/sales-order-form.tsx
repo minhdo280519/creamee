@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { EntityCombobox, type EntityOption } from '@/components/entity-combobox';
+import { VariantPicker } from '@/components/variant-picker';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -50,8 +51,9 @@ interface Props {
 }
 
 interface DraftLine extends SOLineDraft {
-  /** key React. */
   _key: string;
+  variant_id?: string | null;
+  variant_label?: string;
 }
 
 const APPROVAL_THRESHOLD = 50_000_000;
@@ -104,14 +106,29 @@ export function SalesOrderForm({
     setLines((prev) => prev.map((l) => (l._key === key ? { ...l, ...patch } : l)));
   }
 
-  // Chọn sản phẩm → tự điền tên + giá sỉ (ưu tiên) hoặc giá lẻ.
   function pickProduct(key: string, id: string | null) {
-    if (!id) { updateLine(key, { product_id: '', product_name: '' }); return; }
+    if (!id) {
+      updateLine(key, { product_id: '', product_name: '', variant_id: null, variant_label: '' });
+      return;
+    }
     const p = productMapRef.current.get(id);
     updateLine(key, {
       product_id: id,
       product_name: p?.label ?? '',
       unit_price: p ? (p.wholesale_price_vnd ?? p.base_price_vnd) : 0,
+      variant_id: null,
+      variant_label: '',
+    });
+  }
+
+  function pickVariant(key: string, variant: import('@/lib/types').ProductVariant | null) {
+    if (!variant) { updateLine(key, { variant_id: null, variant_label: '' }); return; }
+    const label = [variant.color, variant.size].filter(Boolean).join(' / ') || variant.sku;
+    updateLine(key, {
+      variant_id: variant.id,
+      variant_label: label,
+      // Dùng giá variant nếu có, không thì giữ nguyên
+      unit_price: variant.price_vnd > 0 ? variant.price_vnd : undefined,
     });
   }
 
@@ -244,7 +261,7 @@ export function SalesOrderForm({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="min-w-[200px]">Sản phẩm</TableHead>
+                <TableHead className="min-w-[220px]">Sản phẩm / Variant</TableHead>
                 <TableHead className="w-24">SL</TableHead>
                 <TableHead className="w-36">Đơn giá</TableHead>
                 <TableHead className="w-24">CK %</TableHead>
@@ -273,6 +290,11 @@ export function SalesOrderForm({
                           });
                           return created;
                         }}
+                      />
+                      <VariantPicker
+                        productId={line.product_id || null}
+                        selectedVariantId={line.variant_id ?? null}
+                        onSelect={(v) => pickVariant(line._key, v)}
                       />
                     </TableCell>
                     <TableCell>
