@@ -75,6 +75,30 @@ jobs:
             "${VPS_USER}@${VPS_HOST}" << 'ENDSSH'
           set -e
           cd /opt/creamee
+
+          # Load .env để kiểm tra MySQL host
+          if [ -f .env ]; then
+            set -o allexport; source .env; set +o allexport
+          fi
+          echo "→ Kiểm tra MySQL (${MYSQL_HOST:-127.0.0.1}:${MYSQL_PORT:-3306})..."
+
+          # Đợi MySQL sẵn sàng tối đa 30 giây
+          for i in $(seq 1 6); do
+            if mysqladmin -h "${MYSQL_HOST:-127.0.0.1}" -P "${MYSQL_PORT:-3306}" \
+                -u "${MYSQL_USER}" --password="${MYSQL_PASSWORD}" ping --silent 2>/dev/null; then
+              echo "  MySQL OK"
+              break
+            fi
+            echo "  Thử lần $i/6 — đợi 5s..."
+            sleep 5
+            if [ "$i" -eq 6 ]; then
+              echo "  Lỗi: không kết nối được MySQL sau 30s"
+              # In trạng thái service để debug
+              systemctl is-active mysql 2>/dev/null || systemctl is-active mysqld 2>/dev/null || echo "  (không tìm thấy mysql service)"
+              exit 1
+            fi
+          done
+
           echo "→ Chạy DB migrations..."
           bash migrations/run.sh
           echo "→ Cài dependencies..."
