@@ -85,22 +85,26 @@ jobs:
           fi
           echo "→ Kiểm tra MySQL (${MYSQL_HOST:-127.0.0.1}:${MYSQL_PORT:-3306})..."
 
-          # Đợi MySQL sẵn sàng tối đa 30 giây
-          for i in $(seq 1 6); do
+          # Đợi MySQL sẵn sàng tối đa 100 giây
+          MYSQL_READY=0
+          for i in $(seq 1 20); do
+            SVC_STATE=$(systemctl is-active mysql 2>/dev/null \
+                        || systemctl is-active mysqld 2>/dev/null \
+                        || echo "not-found")
             if mysqladmin -h "${MYSQL_HOST:-127.0.0.1}" -P "${MYSQL_PORT:-3306}" \
                 -u "${MYSQL_USER}" --password="${MYSQL_PASSWORD}" ping --silent 2>/dev/null; then
-              echo "  MySQL OK"
+              echo "  MySQL OK (sau ${i} lần thử)"
+              MYSQL_READY=1
               break
             fi
-            echo "  Thử lần $i/6 — đợi 5s..."
+            echo "  Thử $i/20 — MySQL service: $SVC_STATE — đợi 5s..."
             sleep 5
-            if [ "$i" -eq 6 ]; then
-              echo "  Lỗi: không kết nối được MySQL sau 30s"
-              # In trạng thái service để debug
-              systemctl is-active mysql 2>/dev/null || systemctl is-active mysqld 2>/dev/null || echo "  (không tìm thấy mysql service)"
-              exit 1
-            fi
           done
+          if [ "$MYSQL_READY" -eq 0 ]; then
+            echo "  Lỗi: MySQL không sẵn sàng sau 100s"
+            journalctl -u mysql --no-pager -n 20 2>/dev/null || true
+            exit 1
+          fi
 
           echo "→ Chạy DB migrations..."
           bash migrations/run.sh
