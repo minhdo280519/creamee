@@ -79,15 +79,36 @@ jobs:
           set -e
           cd /opt/creamee
 
+          # --- Swap: tạo nếu chưa có (ngăn OOM kill) ---
+          if [ ! -f /swapfile ]; then
+            echo "→ Tạo swap 2GB..."
+            fallocate -l 2G /swapfile
+            chmod 600 /swapfile
+            mkswap /swapfile
+            swapon /swapfile
+            echo '/swapfile none swap sw 0 0' >> /etc/fstab
+            echo "  Swap OK"
+          fi
+
+          # --- MySQL low-memory config ---
+          if [ ! -f /etc/mysql/mysql.conf.d/lowmem.cnf ]; then
+            echo "→ Cấu hình MySQL low-memory..."
+            printf '[mysqld]\ninnodb_buffer_pool_size = 128M\nperformance_schema = OFF\n' \
+              > /etc/mysql/mysql.conf.d/lowmem.cnf
+            systemctl restart mysql || true
+            echo "  MySQL config đã ghi, đợi restart 15s..."
+            sleep 15
+          fi
+
           # Load .env để kiểm tra MySQL host
           if [ -f .env ]; then
             set -o allexport; source .env; set +o allexport
           fi
           echo "→ Kiểm tra MySQL (${MYSQL_HOST:-127.0.0.1}:${MYSQL_PORT:-3306})..."
 
-          # Đợi MySQL sẵn sàng tối đa 100 giây
+          # Đợi MySQL sẵn sàng tối đa 120 giây
           MYSQL_READY=0
-          for i in $(seq 1 20); do
+          for i in $(seq 1 24); do
             SVC_STATE=$(systemctl is-active mysql 2>/dev/null \
                         || systemctl is-active mysqld 2>/dev/null \
                         || echo "not-found")
@@ -97,12 +118,12 @@ jobs:
               MYSQL_READY=1
               break
             fi
-            echo "  Thử $i/20 — MySQL service: $SVC_STATE — đợi 5s..."
+            echo "  Thử $i/24 — MySQL service: $SVC_STATE — đợi 5s..."
             sleep 5
           done
           if [ "$MYSQL_READY" -eq 0 ]; then
-            echo "  Lỗi: MySQL không sẵn sàng sau 100s"
-            journalctl -u mysql --no-pager -n 20 2>/dev/null || true
+            echo "  Lỗi: MySQL không sẵn sàng sau 120s"
+            journalctl -u mysql --no-pager -n 30 2>/dev/null || true
             exit 1
           fi
 
