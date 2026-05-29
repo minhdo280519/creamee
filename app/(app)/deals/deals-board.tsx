@@ -13,6 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog';
+import { EntityCombobox, type EntityOption } from '@/components/entity-combobox';
 
 interface Deal {
   id: string;
@@ -40,9 +41,11 @@ const STAGES: { key: DealStage; label: string; color: string }[] = [
 
 interface Props {
   deals: Deal[];
+  customers: EntityOption[];
+  onQuickCreateCustomer: (name: string) => Promise<EntityOption>;
 }
 
-export function DealsBoard({ deals }: Props) {
+export function DealsBoard({ deals, customers, onQuickCreateCustomer }: Props) {
   const router = useRouter();
   const [items, setItems] = React.useState(deals);
   const [dragId, setDragId] = React.useState<string | null>(null);
@@ -50,7 +53,7 @@ export function DealsBoard({ deals }: Props) {
 
   // Form tạo deal.
   const [title, setTitle] = React.useState('');
-  const [customerName, setCustomerName] = React.useState('');
+  const [customerId, setCustomerId] = React.useState<string | null>(null);
   const [estValue, setEstValue] = React.useState(0);
   const [closeDate, setCloseDate] = React.useState('');
   const [nextAction, setNextAction] = React.useState('');
@@ -97,7 +100,7 @@ export function DealsBoard({ deals }: Props) {
     }
     const r = await createDeal({
       title,
-      customer_name_snapshot: customerName,
+      customer_id: customerId || undefined,
       estimated_value: estValue,
       expected_close_date: closeDate || undefined,
       next_action: nextAction || undefined,
@@ -109,7 +112,7 @@ export function DealsBoard({ deals }: Props) {
     toast.success('Đã tạo cơ hội bán hàng');
     setDialogOpen(false);
     setTitle('');
-    setCustomerName('');
+    setCustomerId(null);
     setEstValue(0);
     setCloseDate('');
     setNextAction('');
@@ -213,11 +216,14 @@ export function DealsBoard({ deals }: Props) {
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="customer">Khách hàng / tiềm năng</Label>
-              <Input
-                id="customer"
-                value={customerName}
-                onChange={(e) => setCustomerName(e.target.value)}
+              <Label>Khách hàng</Label>
+              <EntityCombobox
+                options={customers}
+                value={customerId}
+                onChange={setCustomerId}
+                entityLabel="khách hàng"
+                placeholder="Chọn hoặc tạo khách hàng"
+                onCreate={onQuickCreateCustomer}
               />
             </div>
             <div className="grid grid-cols-2 gap-3">

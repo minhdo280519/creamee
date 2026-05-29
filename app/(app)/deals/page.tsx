@@ -2,6 +2,7 @@ import { requireAccess } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { PageHeader } from '@/components/page-header';
 import { DealsBoard } from './deals-board';
+import { quickCreateCustomer } from '@/app/(app)/customers/actions';
 import type { DealStage } from './actions';
 
 export const metadata = { title: 'Cơ hội bán hàng — CREAMEE ERP' };
@@ -26,11 +27,17 @@ export default async function DealsPage() {
      LIMIT 300`,
   );
 
+  const { rows: customerRows } = await query<{ id: string; name: string }>(
+    "SELECT id, name FROM customers WHERE is_active = 1 ORDER BY name",
+  );
+
   const deals = dealRows.map((d) => ({
     ...d,
     stage: d.stage as DealStage,
     customer: d.customer_name ? { name: d.customer_name } : null,
   }));
+
+  const customers = customerRows.map((c) => ({ id: c.id, label: c.name }));
 
   return (
     <div>
@@ -38,7 +45,11 @@ export default async function DealsPage() {
         title="Cơ hội bán hàng"
         description="Kéo thả thẻ giữa các cột để cập nhật giai đoạn"
       />
-      <DealsBoard deals={deals} />
+      <DealsBoard
+        deals={deals}
+        customers={customers}
+        onQuickCreateCustomer={quickCreateCustomer}
+      />
     </div>
   );
 }
