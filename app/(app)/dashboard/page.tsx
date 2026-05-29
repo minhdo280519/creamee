@@ -77,7 +77,7 @@ export default async function DashboardPage() {
     ),
     query<{ id: string; code: string; customer_name: string | null; total: number; status: string; order_date: string }>(
       `SELECT so.id, so.code,
-              COALESCE(c.name, so.customer_name_snapshot, '—') AS customer_name,
+              COALESCE(c.name, '—') AS customer_name,
               so.total, so.status, so.order_date
        FROM sales_orders so
        LEFT JOIN customers c ON so.customer_id = c.id
@@ -99,7 +99,7 @@ export default async function DashboardPage() {
     // Today's orders detail
     query<TodayOrder>(
       `SELECT so.id, so.code,
-              COALESCE(c.name, so.customer_name_snapshot, '—') AS customer_name,
+              COALESCE(c.name, '—') AS customer_name,
               so.total, so.status, so.order_date
        FROM sales_orders so
        LEFT JOIN customers c ON so.customer_id = c.id
@@ -110,7 +110,7 @@ export default async function DashboardPage() {
     // Pending approval detail
     query<PendingOrder>(
       `SELECT so.id, so.code,
-              COALESCE(c.name, so.customer_name_snapshot, '—') AS customer_name,
+              COALESCE(c.name, '—') AS customer_name,
               so.total, so.order_date
        FROM sales_orders so
        LEFT JOIN customers c ON so.customer_id = c.id
@@ -128,7 +128,7 @@ export default async function DashboardPage() {
     // AR breakdown
     query<ArRow>(
       `SELECT so.code,
-              COALESCE(c.name, so.customer_name_snapshot, '—') AS customer_name,
+              COALESCE(c.name, '—') AS customer_name,
               so.total, so.paid_amount,
               (so.total - so.paid_amount) AS remaining,
               so.order_date, so.payment_status

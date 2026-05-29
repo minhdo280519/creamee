@@ -38,7 +38,7 @@ export default async function AnalyticsPage() {
     // Top 5 khách hàng theo doanh thu 12 tháng
     query<{ customer_name: string; total: number; order_count: number }>(
       `SELECT
-         COALESCE(c.name, so.customer_name_snapshot, '—') AS customer_name,
+         COALESCE(c.name, '—') AS customer_name,
          SUM(so.total) AS total,
          COUNT(*) AS order_count
        FROM sales_orders so
