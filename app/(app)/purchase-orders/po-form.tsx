@@ -15,6 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { EntityCombobox, type EntityOption } from '@/components/entity-combobox';
+import { VariantPicker } from '@/components/variant-picker';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
@@ -44,6 +45,7 @@ interface DraftLine {
   _key: string;
   product_id: string;
   product_name: string;
+  variant_id?: string | null;
   quantity: number;
   unit_cost_cny: number;
 }
@@ -83,9 +85,20 @@ export function POForm({
     setLines((p) => p.map((l) => (l._key === key ? { ...l, ...patch } : l)));
   }
   function pickProduct(key: string, id: string | null) {
-    if (!id) { updateLine(key, { product_id: '', product_name: '' }); return; }
+    if (!id) { updateLine(key, { product_id: '', product_name: '', variant_id: null }); return; }
     const label = productMapRef.current.get(id) ?? '';
-    updateLine(key, { product_id: id, product_name: label });
+    updateLine(key, { product_id: id, product_name: label, variant_id: null });
+  }
+
+  function pickVariant(key: string, variant: import('@/lib/types').ProductVariant | null) {
+    if (!variant) { updateLine(key, { variant_id: null }); return; }
+    const varLabel = [variant.color, variant.size].filter(Boolean).join(' / ') || variant.sku;
+    const baseName = lines.find((l) => l._key === key)?.product_name ?? '';
+    updateLine(key, {
+      variant_id: variant.id,
+      product_name: `${baseName} — ${varLabel}`,
+      unit_cost_cny: variant.cost_cny > 0 ? variant.cost_cny : (lines.find((l) => l._key === key)?.unit_cost_cny ?? 0),
+    });
   }
 
   // Tổng tiền realtime.
@@ -210,7 +223,7 @@ export function POForm({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="min-w-[200px]">Sản phẩm</TableHead>
+                <TableHead className="min-w-[220px]">Sản phẩm / Variant</TableHead>
                 <TableHead className="w-24">SL</TableHead>
                 <TableHead className="w-36">Giá nhập (¥)</TableHead>
                 <TableHead className="w-36 text-right">Thành tiền (¥)</TableHead>
@@ -232,6 +245,11 @@ export function POForm({
                         productMapRef.current.set(created.id, created.label);
                         return created;
                       }}
+                    />
+                    <VariantPicker
+                      productId={line.product_id || null}
+                      selectedVariantId={line.variant_id ?? null}
+                      onSelect={(v) => pickVariant(line._key, v)}
                     />
                   </TableCell>
                   <TableCell>

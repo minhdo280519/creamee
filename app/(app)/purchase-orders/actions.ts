@@ -10,6 +10,7 @@ import type { ActionResult } from '@/app/(app)/customers/actions';
 export interface POLineDraft {
   product_id: string;
   product_name: string;
+  variant_id?: string | null;
   quantity: number;
   unit_cost_cny: number;
 }
@@ -69,14 +70,13 @@ export async function createPurchaseOrder(
 
   if (affectedRows === 0) return { ok: false, error: 'Không tạo được PO' };
 
-  // Insert items.
   for (const [idx, it] of draft.items.entries()) {
     await query(
       `INSERT INTO purchase_order_items
-       (id, po_id, product_id, product_name_snapshot, quantity, received_qty,
+       (id, po_id, product_id, variant_id, product_name_snapshot, quantity, received_qty,
         unit_cost_cny, line_total_cny, sort_order)
-       VALUES (UUID(), ?, ?, ?, ?, 0, ?, ?, ?)`,
-      [id, it.product_id, it.product_name, it.quantity,
+       VALUES (UUID(), ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
+      [id, it.product_id, it.variant_id ?? null, it.product_name, it.quantity,
        it.unit_cost_cny, it.quantity * it.unit_cost_cny, idx],
     );
   }

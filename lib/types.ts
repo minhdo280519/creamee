@@ -312,6 +312,42 @@ export interface OrderPnL {
   gross_margin_pct: number | null;
 }
 
+// ── Defect Management & QC ───────────────────────────────────
+
+export type DefectHandlingMethod =
+  | 'return_supplier'
+  | 'liquidation'
+  | 'discount'
+  | 'gift'
+  | 'keep';
+
+export interface Defect {
+  id: string;
+  po_id: string;
+  po_item_id: string;
+  product_id: string;
+  variant_id: string | null;
+  defect_reason: string;
+  quantity: number;
+  handling_method: DefectHandlingMethod;
+  handling_notes: string | null;
+  loss_vnd: number;
+  is_resolved: boolean;
+  resolved_at: string | null;
+  resolved_by: string | null;
+  image_urls: string[] | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DefectWithContext extends Defect {
+  po_code: string;
+  product_name: string;
+  variant_color: string | null;
+  variant_size: string | null;
+}
+
 // ── Product Variants ─────────────────────────────────────────
 
 export interface ProductVariant {

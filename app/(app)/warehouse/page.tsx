@@ -2,6 +2,7 @@ import { requireAccess } from '@/lib/auth';
 import { query } from '@/lib/db';
 import { PageHeader } from '@/components/page-header';
 import { WarehouseClient } from './warehouse-client';
+import { getDefects } from './defect-actions';
 
 export const metadata = { title: 'Nhập/Xuất kho — CREAMEE ERP' };
 
@@ -9,23 +10,28 @@ export default async function WarehousePage() {
   await requireAccess('/warehouse');
 
   const [
-    { rows: pendingReceive },
-    { rows: pendingDeliver },
-    { rows: recentMovements },
+    [{ rows: pendingReceive }, { rows: pendingDeliver }, { rows: recentMovements }],
+    defects,
   ] = await Promise.all([
+    Promise.all([
     query<{
       po_id: string; po_code: string; supplier_name: string;
+      po_item_id: string; product_id: string; variant_id: string | null;
       product_name: string; quantity: number; received_qty: number;
       expected_arrival_date: string | null; po_status: string;
+      variant_color: string | null; variant_size: string | null;
     }>(
       `SELECT po.id AS po_id, po.code AS po_code,
               COALESCE(s.name, '—') AS supplier_name,
+              poi.id AS po_item_id, poi.product_id, poi.variant_id,
               poi.product_name_snapshot AS product_name,
               poi.quantity, poi.received_qty,
-              po.expected_arrival_date, po.status AS po_status
+              po.expected_arrival_date, po.status AS po_status,
+              pv.color AS variant_color, pv.size AS variant_size
        FROM purchase_order_items poi
        JOIN purchase_orders po ON poi.po_id = po.id
        LEFT JOIN suppliers s ON po.supplier_id = s.id
+       LEFT JOIN product_variants pv ON poi.variant_id = pv.id
        WHERE po.status IN ('ordered','draft','sent','confirmed','shipping','received')
          AND poi.received_qty < poi.quantity
        ORDER BY po.expected_arrival_date IS NULL, po.expected_arrival_date ASC
@@ -60,18 +66,23 @@ export default async function WarehousePage() {
        ORDER BY il.created_at DESC
        LIMIT 30`,
     ),
+    ]),
+    getDefects({ unresolved_only: false }),
   ]);
+
+  const unresolvedDefects = defects.filter((d) => !d.is_resolved).length;
 
   return (
     <div className="space-y-4">
       <PageHeader
         title="Nhập/Xuất kho"
-        description={`${pendingReceive.length} dòng chờ nhập • ${pendingDeliver.length} dòng chờ xuất`}
+        description={`${pendingReceive.length} dòng chờ nhập • ${pendingDeliver.length} dòng chờ xuất` + (unresolvedDefects > 0 ? ` • ${unresolvedDefects} lỗi chờ xử lý` : '')}
       />
       <WarehouseClient
         pendingReceive={pendingReceive}
         pendingDeliver={pendingDeliver}
         recentMovements={recentMovements}
+        defects={defects}
       />
     </div>
   );
